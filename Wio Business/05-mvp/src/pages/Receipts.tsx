@@ -14,8 +14,6 @@ const C = {
   amber: '#F59E0B',
 }
 
-const shadow = '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)'
-
 type UploadState = 'idle' | 'uploading' | 'matched'
 
 const selectStyle: React.CSSProperties = {
@@ -38,7 +36,6 @@ function inAmountRange(amount: number, range: string): boolean {
 export default function Receipts({ transactions, setTransactions, cards, showToast }: AppState) {
   const [uploadStates, setUploadStates] = useState<Record<string, UploadState>>({})
   const [bulkUploading, setBulkUploading] = useState(false)
-
   const [holderFilter, setHolderFilter] = useState('all')
   const [catFilter, setCatFilter] = useState('all')
   const [amountFilter, setAmountFilter] = useState('all')
@@ -85,13 +82,14 @@ export default function Receipts({ transactions, setTransactions, cards, showToa
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+      {/* Header row */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
         <div>
           <div style={{ fontSize: 15, fontWeight: 500, color: C.textDark, display: 'flex', alignItems: 'center', gap: 8 }}>
             Missing receipts
             {missing.length > 0 && (
-              <span style={{ fontSize: 12, fontWeight: 500, padding: '2px 8px', borderRadius: 99, background: '#FEF3C7', color: '#D97706' }}>
+              <span style={{ fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 99, background: '#FEF3C7', color: '#D97706' }}>
                 {missing.length}
               </span>
             )}
@@ -102,21 +100,16 @@ export default function Receipts({ transactions, setTransactions, cards, showToa
           <button
             onClick={handleBulkUpload}
             disabled={bulkUploading}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 7,
-              border: 'none', cursor: bulkUploading ? 'default' : 'pointer', fontFamily: 'inherit',
-              background: bulkUploading ? '#E5E7EB' : C.purple,
-              color: bulkUploading ? '#9CA3AF' : '#fff',
-              fontSize: 12, fontWeight: 500, transition: 'all 150ms', flexShrink: 0,
-            }}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 7, border: 'none', cursor: bulkUploading ? 'default' : 'pointer', fontFamily: 'inherit', background: bulkUploading ? '#E5E7EB' : C.purple, color: bulkUploading ? '#9CA3AF' : '#fff', fontSize: 12, fontWeight: 500, flexShrink: 0 }}
           >
             {bulkUploading ? <><Spin />&nbsp;Matching all…</> : <><Upload size={13} /> Upload all ({filtered.length})</>}
           </button>
         )}
       </div>
 
+      {/* Filters */}
       {missing.length > 0 && (
-        <div style={{ background: '#fff', borderRadius: 10, padding: '12px 16px', boxShadow: shadow, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <select value={holderFilter} onChange={e => setHolderFilter(e.target.value)} style={selectStyle}>
             <option value="all">All cardholders</option>
             {TEAM.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
@@ -131,72 +124,68 @@ export default function Receipts({ transactions, setTransactions, cards, showToa
             <option value="500-2000">AED 500 – 2,000</option>
             <option value="a2000">Above AED 2,000</option>
           </select>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto' }}>
-            {isFiltered && (
-              <button onClick={clearFilters} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: C.purple, fontFamily: 'inherit' }}>
-                <X size={12} /> Clear
-              </button>
-            )}
-            <span style={{ fontSize: 12, color: C.textLight }}>{filtered.length} of {missing.length} missing</span>
-          </div>
+          {isFiltered && (
+            <button onClick={clearFilters} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: C.purple, fontFamily: 'inherit' }}>
+              <X size={12} /> Clear
+            </button>
+          )}
+          <span style={{ fontSize: 12, color: C.textLight, marginLeft: 'auto' }}>{filtered.length} of {missing.length} missing</span>
         </div>
       )}
 
+      {/* Content */}
       {missing.length === 0 ? (
-        <div style={{ background: '#fff', borderRadius: 12, padding: 48, textAlign: 'center', boxShadow: shadow }}>
-          <CheckCircle size={32} color={C.green} style={{ margin: '0 auto 12px' }} />
-          <div style={{ fontSize: 14, fontWeight: 500, color: C.textDark, marginBottom: 6 }}>All receipts collected</div>
+        <div style={{ textAlign: 'center', padding: '48px 0' }}>
+          <CheckCircle size={28} color={C.green} style={{ margin: '0 auto 12px', display: 'block' }} />
+          <div style={{ fontSize: 14, fontWeight: 500, color: C.textDark, marginBottom: 4 }}>All receipts collected</div>
           <div style={{ fontSize: 12, color: C.textLight }}>Every approved transaction has documentation</div>
         </div>
       ) : filtered.length === 0 ? (
-        <div style={{ background: '#fff', borderRadius: 10, padding: 32, textAlign: 'center', boxShadow: shadow }}>
-          <div style={{ fontSize: 13, color: C.textLight }}>No transactions match your filters</div>
+        <div style={{ textAlign: 'center', padding: '32px 0', color: C.textLight, fontSize: 13 }}>
+          No transactions match your filters
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {filtered.map(tx => {
+        <div>
+          {/* Column headers */}
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: 16, padding: '0 0 12px', borderBottom: `1px solid ${C.border}` }}>
+            {['Transaction', 'Date', 'Amount', ''].map((h, i) => (
+              <div key={i} style={{ fontSize: 10, fontWeight: 500, color: C.textLight, textTransform: 'uppercase', letterSpacing: '0.07em', textAlign: i === 2 ? 'right' : 'left' }}>{h}</div>
+            ))}
+          </div>
+          {filtered.map((tx, idx) => {
             const holder = getCardholder(tx.cardId)
             const state = uploadStates[tx.id] ?? 'idle'
             const isUploading = state === 'uploading'
             const isMatched = state === 'matched'
-
             return (
-              <div key={tx.id} style={{
-                background: '#fff', borderRadius: 10, padding: '16px 20px', boxShadow: shadow,
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 1, minWidth: 0 }}>
-                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: C.purple, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 500, flexShrink: 0 }}>
+              <div key={tx.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: 16, alignItems: 'center', padding: '18px 0', borderBottom: idx < filtered.length - 1 ? `1px solid ${C.border}` : 'none' }}>
+                {/* Merchant + holder */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: '50%', background: C.purple, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 500, flexShrink: 0 }}>
                     {holder?.initials ?? '?'}
                   </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: C.textDark, marginBottom: 2 }}>{tx.merchant}</div>
-                    <div style={{ fontSize: 11, color: C.textLight }}>
-                      {holder?.name} · {fmtDate(tx.date)} · {tx.category}
-                    </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: C.textDark }}>{tx.merchant}</div>
+                    <div style={{ fontSize: 11, color: C.textLight }}>{holder?.name} · {tx.category}</div>
                   </div>
                 </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                  <div style={{ fontSize: 14, fontWeight: 500, color: C.textDark, whiteSpace: 'nowrap' }}>{fmtAED(tx.amount)}</div>
+                {/* Date */}
+                <div style={{ fontSize: 12, color: C.textLight }}>{fmtDate(tx.date)}</div>
+                {/* Amount */}
+                <div style={{ fontSize: 13, fontWeight: 500, color: C.textDark, textAlign: 'right' }}>{fmtAED(tx.amount)}</div>
+                {/* Action */}
+                <div>
                   {isMatched ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 7, background: '#DCFCE7' }}>
-                      <CheckCircle size={14} color={C.green} />
-                      <span style={{ fontSize: 12, color: '#16A34A', fontWeight: 500 }}>AI matched</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#16A34A' }}>
+                      <CheckCircle size={13} /> AI matched
                     </div>
                   ) : (
                     <button
                       onClick={() => handleUpload(tx.id)}
                       disabled={isUploading || bulkUploading}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 7,
-                        fontSize: 12, fontWeight: 500, cursor: (isUploading || bulkUploading) ? 'default' : 'pointer',
-                        border: `1px solid ${(isUploading || bulkUploading) ? '#E5E7EB' : C.purple}`,
-                        color: (isUploading || bulkUploading) ? '#9CA3AF' : C.purple,
-                        background: 'none', transition: 'all 150ms', fontFamily: 'inherit',
-                      }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 7, fontSize: 12, fontWeight: 500, cursor: (isUploading || bulkUploading) ? 'default' : 'pointer', border: `1px solid ${(isUploading || bulkUploading) ? '#E5E7EB' : C.purple}`, color: (isUploading || bulkUploading) ? '#9CA3AF' : C.purple, background: 'none', fontFamily: 'inherit' }}
                     >
-                      {isUploading ? <><Spin /> Matching…</> : <><Upload size={13} /> Upload receipt</>}
+                      {isUploading ? <><Spin /> Matching…</> : <><Upload size={12} /> Upload</>}
                     </button>
                   )}
                 </div>
@@ -206,11 +195,12 @@ export default function Receipts({ transactions, setTransactions, cards, showToa
         </div>
       )}
 
-      <div style={{ background: '#EEE8FF', borderRadius: 10, padding: '16px 20px', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-        <MessageCircle size={16} color={C.purple} style={{ flexShrink: 0, marginTop: 1 }} />
+      {/* Callout */}
+      <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 24, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+        <MessageCircle size={15} color={C.purple} style={{ flexShrink: 0, marginTop: 2 }} />
         <div>
           <div style={{ fontSize: 13, fontWeight: 500, color: C.purple, marginBottom: 4 }}>Push notification the moment a transaction clears</div>
-          <div style={{ fontSize: 12, color: '#5700CC', lineHeight: 1.6 }}>
+          <div style={{ fontSize: 12, color: C.textLight, lineHeight: 1.6 }}>
             One tap to capture the receipt — no chasing team members at month end. OCR extracts the amount, date, merchant, and VAT number automatically.
           </div>
         </div>

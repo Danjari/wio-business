@@ -15,8 +15,6 @@ const C = {
   red: '#EF4444',
 }
 
-const shadow = '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)'
-
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; bg: string; color: string }> = {
     approved: { label: 'Approved', bg: '#DCFCE7', color: '#16A34A' },
@@ -34,8 +32,7 @@ function StatusBadge({ status }: { status: string }) {
 
 const selectStyle: React.CSSProperties = {
   padding: '7px 10px', border: `1px solid ${C.border}`, borderRadius: 7,
-  fontSize: 12, color: C.textMid, background: '#fff', outline: 'none',
-  cursor: 'pointer', minWidth: 120,
+  fontSize: 12, color: C.textMid, background: '#fff', outline: 'none', cursor: 'pointer', minWidth: 120,
 }
 
 function getHolderId(cardId: string, cards: AppState['cards']): string {
@@ -69,7 +66,6 @@ export default function Transactions({ transactions, cards }: AppState) {
   const [amountFilter, setAmountFilter] = useState('all')
 
   const isFiltered = !!(search.trim()) || holderFilter !== 'all' || catFilter !== 'all' || statusFilter !== 'all' || dateFilter !== 'all' || amountFilter !== 'all'
-
   const clearAll = () => { setSearch(''); setHolderFilter('all'); setCatFilter('all'); setStatusFilter('all'); setDateFilter('all'); setAmountFilter('all') }
 
   const filtered = useMemo(() => {
@@ -89,11 +85,9 @@ export default function Transactions({ transactions, cards }: AppState) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <div style={{ fontSize: 15, fontWeight: 500, color: C.textDark }}>Transactions</div>
-
-      {/* Filter bar */}
-      <div style={{ background: '#fff', borderRadius: 10, padding: '14px 16px', boxShadow: shadow, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Filters — no containing box */}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ position: 'relative', minWidth: 180 }}>
           <Search size={13} color={C.textLight} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
           <input
@@ -103,31 +97,26 @@ export default function Transactions({ transactions, cards }: AppState) {
             style={{ ...selectStyle, paddingLeft: 30, width: '100%' }}
           />
         </div>
-
         <select value={holderFilter} onChange={e => setHolderFilter(e.target.value)} style={selectStyle}>
           <option value="all">All cardholders</option>
           {TEAM.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
         </select>
-
         <select value={catFilter} onChange={e => setCatFilter(e.target.value)} style={selectStyle}>
           <option value="all">All categories</option>
           {ALL_CATEGORIES.filter(c => c !== 'All Categories').map(c => <option key={c} value={c}>{c}</option>)}
         </select>
-
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={selectStyle}>
           <option value="all">All statuses</option>
           <option value="approved">Approved</option>
           <option value="pending_approval">Pending approval</option>
           <option value="declined">Declined</option>
         </select>
-
         <select value={dateFilter} onChange={e => setDateFilter(e.target.value)} style={selectStyle}>
           <option value="all">All time</option>
           <option value="month">This month</option>
           <option value="last30">Last 30 days</option>
           <option value="last90">Last 90 days</option>
         </select>
-
         <select value={amountFilter} onChange={e => setAmountFilter(e.target.value)} style={selectStyle}>
           <option value="all">All amounts</option>
           <option value="u500">Under AED 500</option>
@@ -135,7 +124,6 @@ export default function Transactions({ transactions, cards }: AppState) {
           <option value="2000-5000">AED 2,000 – 5,000</option>
           <option value="a5000">Above AED 5,000</option>
         </select>
-
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto' }}>
           {isFiltered && (
             <button onClick={clearAll} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: C.purple, fontFamily: 'inherit', padding: 0 }}>
@@ -148,65 +136,62 @@ export default function Transactions({ transactions, cards }: AppState) {
         </div>
       </div>
 
-      {/* Table */}
-      <div style={{ background: '#fff', borderRadius: 10, overflow: 'hidden', boxShadow: shadow }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ background: C.bg }}>
-              {['Date', 'Merchant', 'Cardholder', 'Category', 'Amount', 'Status', 'Receipt', 'Zoho'].map(h => (
-                <th key={h} style={{
-                  textAlign: h === 'Amount' ? 'right' : 'left',
-                  fontSize: 10, fontWeight: 500, color: C.textLight,
-                  padding: '10px 14px', borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap',
-                  textTransform: 'uppercase', letterSpacing: '0.06em',
-                }}>
-                  {h}
-                </th>
-              ))}
+      {/* Table — no outer box */}
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead>
+          <tr>
+            {['Date', 'Merchant', 'Cardholder', 'Category', 'Amount', 'Status', 'Receipt', 'Zoho'].map(h => (
+              <th key={h} style={{
+                textAlign: h === 'Amount' ? 'right' : 'left',
+                fontSize: 10, fontWeight: 500, color: C.textLight,
+                padding: '0 14px 14px 0', borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap',
+                textTransform: 'uppercase', letterSpacing: '0.06em',
+              }}>
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {filtered.length === 0 ? (
+            <tr>
+              <td colSpan={8} style={{ padding: '36px 0', textAlign: 'center', color: C.textLight, fontSize: 13 }}>
+                No transactions match your filters
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 ? (
-              <tr>
-                <td colSpan={8} style={{ padding: 32, textAlign: 'center', color: C.textLight, fontSize: 13 }}>
-                  No transactions match your filters
+          ) : filtered.map((tx, i) => {
+            const holder = getCardholder(tx.cardId)
+            return (
+              <tr
+                key={tx.id}
+                style={{ borderBottom: i < filtered.length - 1 ? `1px solid ${C.border}` : 'none', transition: 'background 100ms' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLTableRowElement).style.background = '#FAFAFA' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLTableRowElement).style.background = '' }}
+              >
+                <td style={{ padding: '13px 14px 13px 0', fontSize: 12, color: C.textLight, whiteSpace: 'nowrap' }}>{fmtDate(tx.date)}</td>
+                <td style={{ padding: '13px 14px 13px 0', fontSize: 13, color: C.textDark, maxWidth: 180 }}>
+                  <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tx.merchant}</div>
+                  {tx.note && <div style={{ fontSize: 10, color: C.textLight, marginTop: 1 }}>{tx.note}</div>}
+                </td>
+                <td style={{ padding: '13px 14px 13px 0', fontSize: 12, color: C.textMid, whiteSpace: 'nowrap' }}>{holder?.name ?? '—'}</td>
+                <td style={{ padding: '13px 14px 13px 0' }}>
+                  <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, background: '#F3F4F6', color: C.textMid }}>{tx.category}</span>
+                </td>
+                <td style={{ padding: '13px 14px 13px 0', fontSize: 13, fontWeight: 500, color: C.textDark, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtAED(tx.amount)}</td>
+                <td style={{ padding: '13px 14px 13px 0' }}><StatusBadge status={tx.status} /></td>
+                <td style={{ padding: '13px 14px 13px 0' }}>
+                  {tx.hasReceipt ? <CheckCircle2 size={15} color="#16A34A" /> : <AlertCircle size={15} color={C.amber} />}
+                </td>
+                <td style={{ padding: '13px 0' }}>
+                  {tx.zohoSynced
+                    ? <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#16A34A' }}><CheckCircle2 size={13} />Synced</span>
+                    : <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: C.textLight }}><Clock size={13} />Pending</span>}
                 </td>
               </tr>
-            ) : filtered.map((tx, i) => {
-              const holder = getCardholder(tx.cardId)
-              return (
-                <tr key={tx.id}
-                  style={{ borderBottom: i < filtered.length - 1 ? `1px solid ${C.border}` : 'none', transition: 'background 100ms' }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLTableRowElement).style.background = C.bg }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLTableRowElement).style.background = '' }}
-                >
-                  <td style={{ padding: '11px 14px', fontSize: 12, color: C.textLight, whiteSpace: 'nowrap' }}>{fmtDate(tx.date)}</td>
-                  <td style={{ padding: '11px 14px', fontSize: 13, color: C.textDark, maxWidth: 180 }}>
-                    <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tx.merchant}</div>
-                    {tx.note && <div style={{ fontSize: 10, color: C.textLight, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tx.note}</div>}
-                  </td>
-                  <td style={{ padding: '11px 14px', fontSize: 12, color: C.textMid, whiteSpace: 'nowrap' }}>{holder?.name ?? '—'}</td>
-                  <td style={{ padding: '11px 14px' }}>
-                    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, background: '#F3F4F6', color: C.textMid }}>{tx.category}</span>
-                  </td>
-                  <td style={{ padding: '11px 14px', fontSize: 13, fontWeight: 500, color: C.textDark, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtAED(tx.amount)}</td>
-                  <td style={{ padding: '11px 14px' }}><StatusBadge status={tx.status} /></td>
-                  <td style={{ padding: '11px 14px' }}>
-                    {tx.hasReceipt
-                      ? <CheckCircle2 size={15} color="#16A34A" />
-                      : <AlertCircle size={15} color={C.amber} />}
-                  </td>
-                  <td style={{ padding: '11px 14px' }}>
-                    {tx.zohoSynced
-                      ? <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#16A34A' }}><CheckCircle2 size={13} />Synced</span>
-                      : <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: C.textLight }}><Clock size={13} />Pending</span>}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+            )
+          })}
+        </tbody>
+      </table>
     </div>
   )
 }

@@ -5,7 +5,6 @@ import type { AppState } from '../App'
 
 const C = {
   purple: '#5700FF',
-  purpleLight: '#EEE8FF',
   textDark: '#1a1a1a',
   textMid: '#555555',
   textLight: '#999999',
@@ -15,8 +14,6 @@ const C = {
   amber: '#F59E0B',
   red: '#EF4444',
 }
-
-const shadow = '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)'
 
 type Period = 'month' | '3months' | '6months' | 'all'
 
@@ -32,16 +29,6 @@ function periodCutoff(period: Period): string {
   if (period === '3months') return '2026-03-26'
   if (period === '6months') return '2025-12-26'
   return '2000-01-01'
-}
-
-function KPI({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: string }) {
-  return (
-    <div style={{ background: '#fff', borderRadius: 10, padding: '18px 20px', boxShadow: shadow }}>
-      <div style={{ fontSize: 11, color: C.textLight, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 500, color: accent ?? C.textDark, lineHeight: 1 }}>{value}</div>
-      {sub && <div style={{ fontSize: 11, color: C.textLight, marginTop: 6 }}>{sub}</div>}
-    </div>
-  )
 }
 
 const MONTHLY_TREND = [
@@ -62,7 +49,6 @@ export default function Reporting({ transactions, cards }: AppState) {
   }, [transactions, period])
 
   const approved = periodTxs.filter(t => t.status === 'approved')
-
   const totalSpend = approved.reduce((s, t) => s + t.amount, 0)
   const avgTx = approved.length > 0 ? Math.round(totalSpend / approved.length) : 0
   const captureRate = approved.length > 0 ? Math.round((approved.filter(t => t.hasReceipt).length / approved.length) * 100) : 0
@@ -87,17 +73,24 @@ export default function Reporting({ transactions, cards }: AppState) {
 
   const trendMax = Math.max(...MONTHLY_TREND.map(m => m.amount))
 
+  const kpis = [
+    { label: 'Total spend', value: fmtAED(totalSpend), sub: `${approved.length} transactions`, accent: C.purple as string | undefined },
+    { label: 'Avg transaction', value: fmtAED(avgTx), sub: 'per approved transaction', accent: undefined as string | undefined },
+    { label: 'Transactions', value: String(periodTxs.length), sub: `${approved.length} approved`, accent: undefined },
+    { label: 'Receipt capture', value: `${captureRate}%`, sub: `${approved.filter(t => t.hasReceipt).length} of ${approved.length}`, accent: captureRate >= 80 ? '#16A34A' : captureRate >= 50 ? '#D97706' : C.red },
+  ]
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
       {/* Header + period selector */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
         <div style={{ fontSize: 15, fontWeight: 500, color: C.textDark }}>Reporting</div>
-        <div style={{ display: 'flex', background: '#fff', borderRadius: 8, padding: 3, gap: 2, boxShadow: shadow }}>
+        <div style={{ display: 'flex', gap: 2 }}>
           {PERIODS.map(p => (
             <button key={p.value} onClick={() => setPeriod(p.value)} style={{
-              padding: '5px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+              padding: '6px 14px', borderRadius: 7, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
               fontSize: 12, fontWeight: 400, transition: 'all 120ms',
-              background: period === p.value ? C.purple : 'none',
+              background: period === p.value ? C.purple : 'transparent',
               color: period === p.value ? '#fff' : C.textLight,
             }}>
               {p.label}
@@ -106,89 +99,79 @@ export default function Reporting({ transactions, cards }: AppState) {
         </div>
       </div>
 
-      {/* KPI row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
-        <KPI label="Total spend" value={fmtAED(totalSpend)} sub={`${approved.length} transactions`} accent={C.purple} />
-        <KPI label="Avg transaction" value={fmtAED(avgTx)} sub="per approved transaction" />
-        <KPI label="Transactions processed" value={String(periodTxs.length)} sub={`${approved.length} approved`} />
-        <KPI
-          label="Receipt capture rate"
-          value={`${captureRate}%`}
-          sub={`${approved.filter(t => t.hasReceipt).length} of ${approved.length} receipts`}
-          accent={captureRate >= 80 ? '#16A34A' : captureRate >= 50 ? '#D97706' : C.red}
-        />
+      {/* KPI strip */}
+      <div style={{ display: 'flex', paddingBottom: 32, marginBottom: 40, borderBottom: `1px solid ${C.border}` }}>
+        {kpis.map((k, i) => (
+          <div key={i} style={{ flex: 1, paddingLeft: i === 0 ? 0 : 32, paddingRight: i < kpis.length - 1 ? 32 : 0, borderRight: i < kpis.length - 1 ? `1px solid ${C.border}` : 'none' }}>
+            <div style={{ fontSize: 11, color: C.textLight, marginBottom: 10, letterSpacing: '0.02em' }}>{k.label}</div>
+            <div style={{ fontSize: 28, fontWeight: 500, color: k.accent ?? C.textDark, lineHeight: 1, marginBottom: 6 }}>{k.value}</div>
+            <div style={{ fontSize: 11, color: C.textLight }}>{k.sub}</div>
+          </div>
+        ))}
       </div>
 
-      {/* Category + member */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-        <div style={{ background: '#fff', borderRadius: 10, padding: 20, boxShadow: shadow }}>
-          <div style={{ fontSize: 13, fontWeight: 500, color: C.textDark, marginBottom: 16 }}>Spend by category</div>
+      {/* Category + Member — two columns */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 56, marginBottom: 48 }}>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 500, color: C.textLight, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 22 }}>Spend by category</div>
           {catList.length === 0 ? (
-            <div style={{ fontSize: 13, color: C.textLight, textAlign: 'center', padding: '24px 0' }}>No data for this period</div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {catList.map(([cat, amount]) => {
-                const pct = Math.round((amount / totalSpend) * 100)
-                const barW = Math.round((amount / maxCat) * 100)
-                return (
-                  <div key={cat}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <span style={{ fontSize: 12, color: C.textMid }}>{cat}</span>
-                      <span style={{ fontSize: 12, fontWeight: 500, color: C.textDark }}>{fmtAED(amount)}</span>
-                    </div>
-                    <div style={{ height: 5, background: '#F3F4F6', borderRadius: 3, overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${barW}%`, background: C.purple, borderRadius: 3, transition: 'width 400ms ease-out' }} />
-                    </div>
-                    <div style={{ fontSize: 10, color: C.textLight, marginTop: 3 }}>{pct}% of total</div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
+            <div style={{ fontSize: 13, color: C.textLight, padding: '24px 0' }}>No data for this period</div>
+          ) : catList.map(([cat, amount], i) => {
+            const pct = Math.round((amount / totalSpend) * 100)
+            const barW = Math.round((amount / maxCat) * 100)
+            return (
+              <div key={cat} style={{ paddingBottom: 18, marginBottom: i < catList.length - 1 ? 18 : 0, borderBottom: i < catList.length - 1 ? `1px solid ${C.border}` : 'none' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 7 }}>
+                  <span style={{ fontSize: 13, color: C.textMid }}>{cat}</span>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: C.textDark }}>{fmtAED(amount)}</span>
+                </div>
+                <div style={{ height: 3, background: '#F0F0F0', borderRadius: 2, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${barW}%`, background: C.purple, borderRadius: 2, transition: 'width 400ms ease-out' }} />
+                </div>
+                <div style={{ fontSize: 10, color: C.textLight, marginTop: 4 }}>{pct}% of total</div>
+              </div>
+            )
+          })}
         </div>
 
-        <div style={{ background: '#fff', borderRadius: 10, padding: 20, boxShadow: shadow }}>
-          <div style={{ fontSize: 13, fontWeight: 500, color: C.textDark, marginBottom: 16 }}>Spend by team member</div>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 500, color: C.textLight, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 22 }}>Spend by team member</div>
           {memberList.length === 0 ? (
-            <div style={{ fontSize: 13, color: C.textLight, textAlign: 'center', padding: '24px 0' }}>No data for this period</div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {memberList.map(([memberId, amount]) => {
-                const member = TEAM.find(m => m.id === memberId)
-                const pct = Math.round((amount / totalSpend) * 100)
-                const barW = Math.round((amount / maxMember) * 100)
-                return (
-                  <div key={memberId}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, alignItems: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <div style={{ width: 20, height: 20, borderRadius: '50%', background: C.purple, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 500 }}>
-                          {member?.initials ?? '?'}
-                        </div>
-                        <span style={{ fontSize: 12, color: C.textMid }}>{member?.name ?? 'Unknown'}</span>
-                      </div>
-                      <span style={{ fontSize: 12, fontWeight: 500, color: C.textDark }}>{fmtAED(amount)}</span>
+            <div style={{ fontSize: 13, color: C.textLight, padding: '24px 0' }}>No data for this period</div>
+          ) : memberList.map(([memberId, amount], i) => {
+            const member = TEAM.find(m => m.id === memberId)
+            const pct = Math.round((amount / totalSpend) * 100)
+            const barW = Math.round((amount / maxMember) * 100)
+            return (
+              <div key={memberId} style={{ paddingBottom: 18, marginBottom: i < memberList.length - 1 ? 18 : 0, borderBottom: i < memberList.length - 1 ? `1px solid ${C.border}` : 'none' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 7, alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ width: 22, height: 22, borderRadius: '50%', background: C.purple, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 500 }}>
+                      {member?.initials ?? '?'}
                     </div>
-                    <div style={{ height: 5, background: '#F3F4F6', borderRadius: 3, overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${barW}%`, background: '#CEB6FF', borderRadius: 3, transition: 'width 400ms ease-out' }} />
-                    </div>
-                    <div style={{ fontSize: 10, color: C.textLight, marginTop: 3 }}>{pct}% of total</div>
+                    <span style={{ fontSize: 13, color: C.textMid }}>{member?.name ?? 'Unknown'}</span>
                   </div>
-                )
-              })}
-            </div>
-          )}
+                  <span style={{ fontSize: 13, fontWeight: 500, color: C.textDark }}>{fmtAED(amount)}</span>
+                </div>
+                <div style={{ height: 3, background: '#F0F0F0', borderRadius: 2, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${barW}%`, background: '#CEB6FF', borderRadius: 2, transition: 'width 400ms ease-out' }} />
+                </div>
+                <div style={{ fontSize: 10, color: C.textLight, marginTop: 4 }}>{pct}% of total</div>
+              </div>
+            )
+          })}
         </div>
       </div>
 
       {/* Monthly trend */}
-      <div style={{ background: '#fff', borderRadius: 10, padding: 24, boxShadow: shadow }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 24 }}>
-          <TrendingUp size={16} color={C.purple} />
-          <div style={{ fontSize: 13, fontWeight: 500, color: C.textDark }}>Month-over-month spend</div>
+      <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 36, marginBottom: 48 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 28 }}>
+          <TrendingUp size={14} color={C.purple} />
+          <div style={{ fontSize: 11, fontWeight: 500, color: C.textLight, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Month-over-month spend</div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, height: 160 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, height: 140 }}>
           {MONTHLY_TREND.map(({ month, amount }) => {
-            const barH = Math.round((amount / trendMax) * 120)
+            const barH = Math.round((amount / trendMax) * 110)
             const isCurrent = month === 'Jun'
             return (
               <div key={month} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
@@ -196,11 +179,7 @@ export default function Reporting({ transactions, cards }: AppState) {
                   {fmtAED(amount).replace('AED ', '')}
                 </div>
                 <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
-                  <div style={{
-                    width: '70%', height: barH, borderRadius: '4px 4px 0 0',
-                    background: isCurrent ? C.purple : '#CEB6FF',
-                    transition: 'height 400ms ease-out',
-                  }} />
+                  <div style={{ width: '65%', height: barH, borderRadius: '3px 3px 0 0', background: isCurrent ? C.purple : '#E8E3FF', transition: 'height 400ms ease-out' }} />
                 </div>
                 <div style={{ fontSize: 11, color: isCurrent ? C.purple : C.textLight, fontWeight: isCurrent ? 500 : 400 }}>{month}</div>
               </div>
@@ -210,63 +189,27 @@ export default function Reporting({ transactions, cards }: AppState) {
       </div>
 
       {/* Policy compliance */}
-      <div style={{ background: '#fff', borderRadius: 10, padding: 20, boxShadow: shadow }}>
-        <div style={{ fontSize: 13, fontWeight: 500, color: C.textDark, marginBottom: 16 }}>Policy compliance</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
-          <ComplianceStat
-            icon={<CheckCircle2 size={15} color="#16A34A" />}
-            label="Auto-approved"
-            sublabel="Under AED 500"
-            count={autoApproved}
-            total={totalForPolicy}
-            bg="#DCFCE7"
-            color="#16A34A"
-          />
-          <ComplianceStat
-            icon={<User size={15} color="#D97706" />}
-            label="Manager approval"
-            sublabel="AED 500 – 5,000"
-            count={managerApproval}
-            total={totalForPolicy}
-            bg="#FEF3C7"
-            color="#D97706"
-          />
-          <ComplianceStat
-            icon={<Shield size={15} color={C.purple} />}
-            label="Founder approval"
-            sublabel="Above AED 5,000"
-            count={founderApproval}
-            total={totalForPolicy}
-            bg="#EEE8FF"
-            color={C.purple}
-          />
-          <div style={{ background: '#DCFCE7', borderRadius: 10, padding: '16px 18px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-              <AlertCircle size={15} color="#16A34A" />
-              <span style={{ fontSize: 12, fontWeight: 500, color: '#16A34A' }}>Out-of-policy</span>
+      <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 32 }}>
+        <div style={{ fontSize: 11, fontWeight: 500, color: C.textLight, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 28 }}>Policy compliance</div>
+        <div style={{ display: 'flex' }}>
+          {[
+            { icon: <CheckCircle2 size={14} color="#16A34A" />, label: 'Auto-approved', sublabel: 'Under AED 500', count: autoApproved, color: '#16A34A' },
+            { icon: <User size={14} color="#D97706" />, label: 'Manager approval', sublabel: 'AED 500 – 5,000', count: managerApproval, color: '#D97706' },
+            { icon: <Shield size={14} color={C.purple} />, label: 'Founder approval', sublabel: 'Above AED 5,000', count: founderApproval, color: C.purple },
+            { icon: <AlertCircle size={14} color="#16A34A" />, label: 'Out-of-policy', sublabel: 'Clean — no violations', count: 0, color: '#16A34A' },
+          ].map((item, i) => (
+            <div key={item.label} style={{ flex: 1, paddingRight: i < 3 ? 32 : 0, paddingLeft: i > 0 ? 32 : 0, borderRight: i < 3 ? `1px solid ${C.border}` : 'none' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+                {item.icon}
+                <span style={{ fontSize: 12, fontWeight: 500, color: item.color }}>{item.label}</span>
+              </div>
+              <div style={{ fontSize: 28, fontWeight: 500, color: item.color, lineHeight: 1, marginBottom: 6 }}>{item.count}</div>
+              <div style={{ fontSize: 11, color: C.textLight }}>{item.sublabel}</div>
+              <div style={{ fontSize: 11, color: C.textLight, marginTop: 2 }}>{Math.round((item.count / totalForPolicy) * 100)}% of period</div>
             </div>
-            <div style={{ fontSize: 22, fontWeight: 500, color: '#16A34A', lineHeight: 1, marginBottom: 4 }}>0</div>
-            <div style={{ fontSize: 11, color: '#16A34A' }}>Clean — no violations</div>
-          </div>
+          ))}
         </div>
       </div>
-    </div>
-  )
-}
-
-function ComplianceStat({ icon, label, sublabel, count, total, bg, color }: {
-  icon: React.ReactNode; label: string; sublabel: string; count: number; total: number; bg: string; color: string
-}) {
-  const pct = Math.round((count / total) * 100)
-  return (
-    <div style={{ background: bg, borderRadius: 10, padding: '16px 18px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-        {icon}
-        <span style={{ fontSize: 12, fontWeight: 500, color }}>{label}</span>
-      </div>
-      <div style={{ fontSize: 22, fontWeight: 500, color, lineHeight: 1, marginBottom: 4 }}>{count}</div>
-      <div style={{ fontSize: 11, color, opacity: 0.8 }}>{sublabel}</div>
-      <div style={{ fontSize: 11, color, marginTop: 4 }}>{pct}% of period</div>
     </div>
   )
 }

@@ -298,15 +298,17 @@ export default function Cards({ cards, setCards, transactions, navigate, showToa
               boxShadow: shadow,
               opacity: frozen ? 0.75 : 1, transition: 'opacity 200ms',
             }}>
-              <FlipCard
-                gradient={GRADIENTS[idx % GRADIENTS.length]}
-                label={card.label}
-                last4={card.last4}
-                holderName={holder?.name ?? '—'}
-                limit={card.limit}
-                frozen={frozen}
-                fmtAED={fmtAED}
-              />
+              <div style={{ width: '80%' }}>
+                <FlipCard
+                  gradient={GRADIENTS[idx % GRADIENTS.length]}
+                  label={card.label}
+                  last4={card.last4}
+                  holderName={holder?.name ?? '—'}
+                  limit={card.limit}
+                  frozen={frozen}
+                  fmtAED={fmtAED}
+                />
+              </div>
 
               <div style={{ marginTop: 18 }}>
                 {/* Spend progress */}
