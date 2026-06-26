@@ -222,7 +222,7 @@ export default function App() {
         </header>
 
         {/* Page content */}
-        <main style={{ flex: 1, padding: 28, overflowY: 'auto' }}>
+        <main style={{ flex: 1, padding: '32px 36px', overflowY: 'auto', background: '#fff' }}>
           <div key={page} style={{ animation: 'pageFade 200ms ease-out' }}>
             {page === 'dashboard' && <Dashboard {...appState} />}
             {page === 'cards' && <Cards {...appState} />}

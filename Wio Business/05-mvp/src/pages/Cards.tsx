@@ -18,11 +18,16 @@ const C = {
 const shadow = '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)'
 
 const GRADIENTS = [
-  'linear-gradient(135deg, #5700FF 0%, #0F1A38 100%)',
-  'linear-gradient(135deg, #0F1A38 0%, #1e3a6e 100%)',
-  'linear-gradient(135deg, #3a006e 0%, #5700FF 100%)',
-  'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
-  'linear-gradient(135deg, #0F1A38 0%, #5700FF 100%)',
+  // Deep royal navy — rich midnight blue with a brighter blue sweep
+  'linear-gradient(140deg, #04091A 0%, #071640 40%, #0D2B72 65%, #061230 100%)',
+  // Gunmetal iron — warm charcoal with a lifted steel midpoint
+  'linear-gradient(135deg, #0E0E0E 0%, #1E2330 38%, #2E3545 62%, #131519 100%)',
+  // Slate / brushed titanium — cool blue-grey with a silver lift
+  'linear-gradient(125deg, #141E28 0%, #243448 35%, #3A5068 58%, #1A2A3C 100%)',
+  // Obsidian — near-black with subtle violet depth
+  'linear-gradient(150deg, #0A080F 0%, #16122A 40%, #211B3A 62%, #100E1E 100%)',
+  // Dark petrol — deep teal-navy, like carbon-coated ocean
+  'linear-gradient(130deg, #060F1E 0%, #0C2040 38%, #173655 62%, #09192F 100%)',
 ]
 
 function IssueCardModal({ onClose, onIssue }: { onClose: () => void; onIssue: (card: Card) => void }) {
