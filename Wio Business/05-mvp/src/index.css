@@ -1,0 +1,9 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #root { height: 100%; }
+body { font-family: 'Inter', system-ui, sans-serif; font-weight: 400; background: #F7F7F9; color: #1a1a1a; -webkit-font-smoothing: antialiased; }
+b, strong { font-weight: 500; }
+input, select, textarea, button { font-family: inherit; }
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 4px; }
+* { scrollbar-width: thin; scrollbar-color: #E5E7EB transparent; }
