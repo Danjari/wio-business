@@ -45,7 +45,7 @@ export default function Accounting({ transactions, cards, showToast }: AppState)
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
       {/* Zoho connection — clean status row, no card box */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 28, marginBottom: 32, borderBottom: `1px solid ${C.border}` }}>
+      <div className="acct-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 28, marginBottom: 32, borderBottom: `1px solid ${C.border}` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{ width: 40, height: 40, borderRadius: 10, background: '#E6FAF6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 500, color: C.zoho }}>
             ZB
@@ -76,7 +76,7 @@ export default function Accounting({ transactions, cards, showToast }: AppState)
       </div>
 
       {/* KPI strip */}
-      <div style={{ display: 'flex', paddingBottom: 32, marginBottom: 40, borderBottom: `1px solid ${C.border}` }}>
+      <div className="report-kpi" style={{ display: 'flex', paddingBottom: 32, marginBottom: 40, borderBottom: `1px solid ${C.border}` }}>
         {kpis.map((k, i) => (
           <div key={k.label} style={{ flex: 1, paddingLeft: i === 0 ? 0 : 32, paddingRight: i < kpis.length - 1 ? 32 : 0, borderRight: i < kpis.length - 1 ? `1px solid ${C.border}` : 'none' }}>
             <div style={{ fontSize: 11, color: C.textLight, marginBottom: 10, letterSpacing: '0.02em' }}>{k.label}</div>
@@ -86,9 +86,9 @@ export default function Accounting({ transactions, cards, showToast }: AppState)
       </div>
 
       {/* Sync log — table, no outer box */}
-      <div style={{ marginBottom: 40 }}>
+      <div className="table-scroll" style={{ marginBottom: 40 }}>
         <div style={{ fontSize: 11, fontWeight: 500, color: C.textLight, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 20 }}>Sync log</div>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 560 }}>
           <thead>
             <tr>
               {['Date', 'Merchant', 'Amount', 'Category', 'Chart of accounts', 'Status'].map(h => (
@@ -158,7 +158,7 @@ export default function Accounting({ transactions, cards, showToast }: AppState)
       {/* Coming soon */}
       <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 28 }}>
         <div style={{ fontSize: 11, fontWeight: 500, color: C.textLight, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 20 }}>Coming in Phase 2</div>
-        <div style={{ display: 'flex', gap: 16 }}>
+        <div className="acct-integrations" style={{ display: 'flex', gap: 16 }}>
           {[
             { name: 'QuickBooks Online', color: '#2CA01C' },
             { name: 'Xero', color: '#13B5EA' },

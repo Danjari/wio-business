@@ -88,7 +88,7 @@ export default function Approvals({ approvals, setApprovals, processed, setProce
                 const isFounder = item.requiredLevel === 'founder'
                 const accentColor = isFounder ? C.purple : C.amber
                 return (
-                  <div key={item.id} style={{
+                  <div key={item.id} className="approval-item" style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24,
                     padding: '24px 0',
                     borderBottom: `1px solid ${C.border}`,
@@ -182,7 +182,7 @@ export default function Approvals({ approvals, setApprovals, processed, setProce
           ) : (
             <div>
               {/* Table header */}
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 16, padding: '0 0 12px', borderBottom: `1px solid ${C.border}` }}>
+              <div className="approval-proc-header" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 16, padding: '0 0 12px', borderBottom: `1px solid ${C.border}` }}>
                 {['Merchant / Requester', 'Amount', 'Date', 'Outcome'].map((h, i) => (
                   <div key={h} style={{ fontSize: 10, fontWeight: 500, color: C.textLight, textTransform: 'uppercase', letterSpacing: '0.07em', textAlign: i > 0 ? 'right' : 'left' }}>{h}</div>
                 ))}
@@ -191,7 +191,7 @@ export default function Approvals({ approvals, setApprovals, processed, setProce
                 const requester = TEAM.find(m => m.id === item.requestedById)
                 const approved = item.outcome === 'approved'
                 return (
-                  <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 16, alignItems: 'center', padding: '16px 0', borderBottom: i < filteredProcessed.length - 1 ? `1px solid ${C.border}` : 'none' }}>
+                  <div key={item.id} className="approval-proc-row" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 16, alignItems: 'center', padding: '16px 0', borderBottom: i < filteredProcessed.length - 1 ? `1px solid ${C.border}` : 'none' }}>
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 500, color: C.textDark }}>{item.merchant}</div>
                       <div style={{ fontSize: 11, color: C.textLight, marginTop: 2 }}>{requester?.name}</div>

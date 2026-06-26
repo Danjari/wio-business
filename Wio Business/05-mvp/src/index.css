@@ -9,18 +9,42 @@ input, select, textarea, button { font-family: inherit; }
 * { scrollbar-width: thin; scrollbar-color: #E5E7EB transparent; }
 @media (max-width: 767px) {
   body { overflow-x: hidden; }
-  /* Dashboard KPI strip: 2-column on mobile */
+
+  /* ── Dashboard ───────────────────────────────────────── */
   .kpi-strip { flex-wrap: wrap !important; }
   .kpi-strip > * { flex: 1 1 calc(50% - 1px) !important; padding: 0 0 20px 0 !important; border-right: none !important; }
   .kpi-strip > *:nth-child(odd) { padding-right: 16px !important; }
-  /* Dashboard body: single column */
   .dash-body { grid-template-columns: 1fr !important; gap: 32px !important; }
-  /* Team grid: collapse columns */
-  .team-header { display: none !important; }
-  .team-row { grid-template-columns: 1fr 1fr !important; }
-  .team-row > *:nth-child(2) { display: none !important; }
-  /* Tables: horizontal scroll */
-  .table-scroll { overflow-x: auto !important; }
-  /* Cards grid: single column */
+
+  /* ── Cards ───────────────────────────────────────────── */
   .cards-grid { grid-template-columns: 1fr !important; }
+  /* Hide preview panel in modal on mobile */
+  .issue-modal .modal-preview { display: none !important; }
+
+  /* ── Team ────────────────────────────────────────────── */
+  .team-table { display: none !important; }
+  .team-cards { display: grid !important; }
+
+  /* ── Approvals ───────────────────────────────────────── */
+  .approval-item { flex-direction: column !important; align-items: flex-start !important; gap: 16px !important; }
+  .approval-item > *:last-child { width: 100% !important; justify-content: flex-start !important; }
+  .approval-proc-header { display: none !important; }
+  .approval-proc-row { grid-template-columns: 1fr 1fr !important; }
+  .approval-proc-row > *:nth-child(3) { display: none !important; }
+
+  /* ── Reporting ───────────────────────────────────────── */
+  .report-header { flex-direction: column !important; align-items: flex-start !important; gap: 12px !important; }
+  .report-kpi { flex-wrap: wrap !important; gap: 0 !important; }
+  .report-kpi > * { flex: 1 1 calc(50% - 1px) !important; padding: 0 0 24px 0 !important; border-right: none !important; min-width: 0 !important; }
+  .report-kpi > *:nth-child(odd) { padding-right: 20px !important; }
+  .report-cols { grid-template-columns: 1fr !important; gap: 32px !important; }
+  .report-policy { flex-wrap: wrap !important; }
+  .report-policy > * { flex: 1 1 calc(50% - 1px) !important; padding: 0 0 24px 0 !important; border-right: none !important; min-width: 0 !important; }
+  .report-policy > *:nth-child(odd) { padding-right: 20px !important; }
+
+  /* ── Accounting ──────────────────────────────────────── */
+  .acct-header { flex-direction: column !important; align-items: flex-start !important; gap: 14px !important; }
+  .acct-header > *:last-child { align-self: stretch !important; justify-content: space-between !important; }
+  .table-scroll { overflow-x: auto !important; }
+  .acct-integrations { flex-direction: column !important; }
 }

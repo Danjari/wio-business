@@ -84,7 +84,7 @@ export default function Reporting({ transactions, cards }: AppState) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
       {/* Header + period selector */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
+      <div className="report-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
         <div style={{ fontSize: 15, fontWeight: 500, color: C.textDark }}>Reporting</div>
         <div style={{ display: 'flex', gap: 2 }}>
           {PERIODS.map(p => (
@@ -101,7 +101,7 @@ export default function Reporting({ transactions, cards }: AppState) {
       </div>
 
       {/* KPI strip */}
-      <div style={{ display: 'flex', paddingBottom: 32, marginBottom: 40, borderBottom: `1px solid ${C.border}` }}>
+      <div className="report-kpi" style={{ display: 'flex', paddingBottom: 32, marginBottom: 40, borderBottom: `1px solid ${C.border}` }}>
         {kpis.map((k, i) => (
           <div key={i} style={{ flex: 1, paddingLeft: i === 0 ? 0 : 32, paddingRight: i < kpis.length - 1 ? 32 : 0, borderRight: i < kpis.length - 1 ? `1px solid ${C.border}` : 'none' }}>
             <div style={{ fontSize: 11, color: C.textLight, marginBottom: 10, letterSpacing: '0.02em' }}>{k.label}</div>
@@ -112,7 +112,7 @@ export default function Reporting({ transactions, cards }: AppState) {
       </div>
 
       {/* Category + Member — two columns */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 56, marginBottom: 48 }}>
+      <div className="report-cols" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 56, marginBottom: 48 }}>
         <div>
           <div style={{ fontSize: 11, fontWeight: 500, color: C.textLight, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 22 }}>Spend by category</div>
           {catList.length === 0 ? (
@@ -190,7 +190,7 @@ export default function Reporting({ transactions, cards }: AppState) {
       {/* Policy compliance */}
       <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 32 }}>
         <div style={{ fontSize: 11, fontWeight: 500, color: C.textLight, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 28 }}>Policy compliance</div>
-        <div style={{ display: 'flex' }}>
+        <div className="report-policy" style={{ display: 'flex' }}>
           {[
             { icon: <CheckCircle2 size={14} color="#16A34A" />, label: 'Auto-approved', sublabel: 'Under AED 500', count: autoApproved, color: '#16A34A' },
             { icon: <User size={14} color="#D97706" />, label: 'Manager approval', sublabel: 'AED 500 – 5,000', count: managerApproval, color: '#D97706' },

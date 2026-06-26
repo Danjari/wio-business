@@ -84,8 +84,9 @@ function IssueCardModal({ onClose, onIssue }: { onClose: () => void; onIssue: (c
     >
       <div
         onClick={e => e.stopPropagation()}
+        className="issue-modal"
         style={{
-          background: '#fff', borderRadius: 14, width: 780, maxHeight: '90vh',
+          background: '#fff', borderRadius: 14, width: 780, maxWidth: 'calc(100vw - 32px)', maxHeight: '90vh',
           display: 'flex', overflow: 'hidden',
           boxShadow: '0 24px 80px rgba(0,0,0,0.2)',
         }}
@@ -191,7 +192,7 @@ function IssueCardModal({ onClose, onIssue }: { onClose: () => void; onIssue: (c
         </div>
 
         {/* Preview */}
-        <div style={{ width: 300, padding: 28, background: C.bg, display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div className="modal-preview" style={{ width: 300, padding: 28, background: C.bg, display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div style={{ fontSize: 11, fontWeight: 500, color: C.textLight, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Preview</div>
           <FlipCard
             gradient={GRADIENTS[0]}

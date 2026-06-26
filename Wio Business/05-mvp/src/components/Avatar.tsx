@@ -1,4 +1,6 @@
-import React from 'react'
+import React, { useMemo } from 'react'
+import { createAvatar } from '@dicebear/core'
+import * as loreleiNeutral from '@dicebear/lorelei-neutral'
 
 type AvatarProps = {
   seed: string
@@ -7,19 +9,23 @@ type AvatarProps = {
 }
 
 export default function Avatar({ seed, size = 36, style }: AvatarProps) {
-  const url =
-    `https://api.dicebear.com/10.x/lorelei-neutral/svg` +
-    `?seed=${encodeURIComponent(seed)}` +
-    `&backgroundColor=f0f0f0` +
-    `&scale=85` +
-    `&radius=50`
+  const svg = useMemo(
+    () => createAvatar(loreleiNeutral, { seed, size, backgroundColor: ['eff1f5'] }).toString(),
+    [seed, size],
+  )
+
   return (
-    <img
-      src={url}
-      alt={seed}
-      width={size}
-      height={size}
-      style={{ borderRadius: '50%', display: 'block', flexShrink: 0, background: '#f0f0f0', ...style }}
+    <div
+      dangerouslySetInnerHTML={{ __html: svg }}
+      style={{
+        width: size,
+        height: size,
+        borderRadius: '50%',
+        overflow: 'hidden',
+        flexShrink: 0,
+        display: 'inline-block',
+        ...style,
+      }}
     />
   )
 }
