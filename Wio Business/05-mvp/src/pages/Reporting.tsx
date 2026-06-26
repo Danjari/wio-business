@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { TrendingUp, CheckCircle2, Shield, User, AlertCircle } from 'lucide-react'
 import { TEAM, fmtAED } from '../data'
 import type { AppState } from '../App'
+import Avatar from '../components/Avatar'
 
 const C = {
   purple: '#5700FF',
@@ -146,9 +147,7 @@ export default function Reporting({ transactions, cards }: AppState) {
               <div key={memberId} style={{ paddingBottom: 18, marginBottom: i < memberList.length - 1 ? 18 : 0, borderBottom: i < memberList.length - 1 ? `1px solid ${C.border}` : 'none' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 7, alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ width: 22, height: 22, borderRadius: '50%', background: C.purple, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 500 }}>
-                      {member?.initials ?? '?'}
-                    </div>
+                    <Avatar seed={member?.name ?? ''} size={22} />
                     <span style={{ fontSize: 13, color: C.textMid }}>{member?.name ?? 'Unknown'}</span>
                   </div>
                   <span style={{ fontSize: 13, fontWeight: 500, color: C.textDark }}>{fmtAED(amount)}</span>

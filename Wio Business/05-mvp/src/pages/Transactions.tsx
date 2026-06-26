@@ -137,7 +137,8 @@ export default function Transactions({ transactions, cards }: AppState) {
       </div>
 
       {/* Table — no outer box */}
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <div className="table-scroll">
+      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
         <thead>
           <tr>
             {['Date', 'Merchant', 'Cardholder', 'Category', 'Amount', 'Status', 'Receipt', 'Zoho'].map(h => (
@@ -192,6 +193,7 @@ export default function Transactions({ transactions, cards }: AppState) {
           })}
         </tbody>
       </table>
+      </div>
     </div>
   )
 }

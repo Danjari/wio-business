@@ -1,6 +1,7 @@
 import React from 'react'
 import { TEAM, fmtAED, fmtDate } from '../data'
 import type { AppState } from '../App'
+import Avatar from '../components/Avatar'
 
 const C = {
   purple: '#5700FF',
@@ -57,7 +58,7 @@ export default function Dashboard({ cards, transactions, approvals, navigate }: 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       {/* KPI strip */}
-      <div style={{ display: 'flex', paddingBottom: 32, marginBottom: 40, borderBottom: `1px solid ${C.border}` }}>
+      <div className="kpi-strip" style={{ display: 'flex', paddingBottom: 32, marginBottom: 40, borderBottom: `1px solid ${C.border}` }}>
         {kpis.map((k, i) => (
           <div
             key={i}
@@ -78,7 +79,7 @@ export default function Dashboard({ cards, transactions, approvals, navigate }: 
       </div>
 
       {/* Two-column body */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 56, marginBottom: 48 }}>
+      <div className="dash-body" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 56, marginBottom: 48 }}>
         {/* Spend by category */}
         <div>
           <div style={{ fontSize: 11, fontWeight: 500, color: C.textLight, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 22 }}>Spend by category</div>
@@ -107,9 +108,7 @@ export default function Dashboard({ cards, transactions, approvals, navigate }: 
             const warn = pct > 80
             return (
               <div key={card.id} style={{ display: 'flex', alignItems: 'center', gap: 12, paddingBottom: 18, marginBottom: i < cards.length - 1 ? 18 : 0, borderBottom: i < cards.length - 1 ? `1px solid ${C.border}` : 'none' }}>
-                <div style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0, background: C.purple, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 500 }}>
-                  {holder?.initials}
-                </div>
+                <Avatar seed={holder?.name ?? ''} size={28} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                     <span style={{ fontSize: 12, color: C.textMid, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.label}</span>
@@ -131,7 +130,8 @@ export default function Dashboard({ cards, transactions, approvals, navigate }: 
           <div style={{ fontSize: 11, fontWeight: 500, color: C.textLight, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Recent transactions</div>
           <button onClick={() => navigate('transactions')} style={{ fontSize: 12, color: C.purple, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 400, fontFamily: 'inherit' }}>View all →</button>
         </div>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div className="table-scroll">
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 480 }}>
           <thead>
             <tr>
               {['Date', 'Merchant', 'Cardholder', 'Category', 'Amount', 'Status'].map(h => (
@@ -167,6 +167,7 @@ export default function Dashboard({ cards, transactions, approvals, navigate }: 
             })}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )

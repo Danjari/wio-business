@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import {
   LayoutDashboard, CreditCard, CheckCircle, Receipt, ArrowLeftRight,
-  Users, BarChart2, BookOpen, Bell,
+  Users, BarChart2, BookOpen, Bell, Menu, X as XIcon,
 } from 'lucide-react'
 import {
   TEAM, INITIAL_CARDS, INITIAL_TRANSACTIONS, INITIAL_APPROVALS,
@@ -16,6 +16,20 @@ import Transactions from './pages/Transactions'
 import Team from './pages/Team'
 import Reporting from './pages/Reporting'
 import Accounting from './pages/Accounting'
+import Avatar from './components/Avatar'
+
+const MOBILE_BP = 768
+
+function useIsMobile() {
+  const [mobile, setMobile] = useState(() => window.innerWidth < MOBILE_BP)
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${MOBILE_BP - 1}px)`)
+    const handler = (e: MediaQueryListEvent) => setMobile(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
+  return mobile
+}
 
 type Page = 'dashboard' | 'cards' | 'approvals' | 'receipts' | 'transactions' | 'team' | 'reporting' | 'accounting'
 
@@ -59,7 +73,9 @@ const NAV: { id: Page; label: string; icon: React.ReactNode }[] = [
 let toastCounter = 0
 
 export default function App() {
+  const isMobile = useIsMobile()
   const [page, setPage] = useState<Page>('dashboard')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [cards, setCards] = useState<Card[]>(INITIAL_CARDS)
   const [transactions, setTransactions] = useState<Transaction[]>(INITIAL_TRANSACTIONS)
   const [approvals, setApprovals] = useState<Approval[]>(INITIAL_APPROVALS)
@@ -70,7 +86,10 @@ export default function App() {
   const pendingCount = approvals.length
   const missingReceiptCount = transactions.filter(t => !t.hasReceipt && t.status !== 'pending_approval' && t.status !== 'declined').length
 
-  const navigate = useCallback((p: Page) => setPage(p), [])
+  const navigate = useCallback((p: Page) => {
+    setPage(p)
+    setSidebarOpen(false)
+  }, [])
 
   const showToast = useCallback((message: string, variant: 'success' | 'error' = 'success') => {
     const id = ++toastCounter
@@ -80,11 +99,16 @@ export default function App() {
 
   useEffect(() => {
     const fn = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setPage('dashboard')
+      if (e.key === 'Escape') { setPage('dashboard'); setSidebarOpen(false) }
     }
     window.addEventListener('keydown', fn)
     return () => window.removeEventListener('keydown', fn)
   }, [])
+
+  // Close sidebar when switching to desktop
+  useEffect(() => {
+    if (!isMobile) setSidebarOpen(false)
+  }, [isMobile])
 
   const appState: AppState = {
     cards, setCards,
@@ -97,17 +121,35 @@ export default function App() {
 
   const founder = TEAM.find(t => t.isFounder)!
 
+  const sidebarVisible = !isMobile || sidebarOpen
+
   return (
     <div style={{ display: 'flex', height: '100%', background: '#F7F7F9' }}>
+
+      {/* Mobile overlay backdrop */}
+      {isMobile && sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(0,0,0,0.40)',
+            zIndex: 199,
+          }}
+        />
+      )}
+
       {/* Sidebar */}
       <aside style={{
         width: 220, flexShrink: 0, background: '#FAFAFA',
         borderRight: '1px solid #EBEBEB',
         display: 'flex', flexDirection: 'column',
-        position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 30,
+        position: 'fixed', top: 0, left: 0, bottom: 0,
+        zIndex: 200,
+        transform: sidebarVisible ? 'translateX(0)' : 'translateX(-100%)',
+        transition: 'transform 260ms cubic-bezier(0.4,0,0.2,1)',
       }}>
-        {/* Logo */}
-        <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid #EBEBEB' }}>
+        {/* Logo + close button (mobile) */}
+        <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid #EBEBEB', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{
               width: 28, height: 28, borderRadius: 6,
@@ -121,6 +163,14 @@ export default function App() {
               <div style={{ fontSize: 10, color: C.textLight, fontWeight: 400 }}>Spend Management</div>
             </div>
           </div>
+          {isMobile && (
+            <button
+              onClick={() => setSidebarOpen(false)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.textLight, display: 'flex', padding: 4 }}
+            >
+              <XIcon size={18} />
+            </button>
+          )}
         </div>
 
         {/* Nav */}
@@ -138,7 +188,7 @@ export default function App() {
             return (
               <button
                 key={item.id}
-                onClick={() => setPage(item.id)}
+                onClick={() => navigate(item.id)}
                 onMouseEnter={() => setHoveredNav(item.id)}
                 onMouseLeave={() => setHoveredNav(null)}
                 style={{
@@ -186,23 +236,37 @@ export default function App() {
       </aside>
 
       {/* Main */}
-      <div style={{ marginLeft: 220, flex: 1, display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
+      <div style={{ marginLeft: isMobile ? 0 : 220, flex: 1, display: 'flex', flexDirection: 'column', minHeight: '100%', minWidth: 0 }}>
         {/* Header */}
         <header style={{
           height: 56, background: '#fff', borderBottom: `1px solid ${C.border}`,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '0 28px', position: 'sticky', top: 0, zIndex: 20, flexShrink: 0,
+          padding: isMobile ? '0 16px' : '0 28px',
+          position: 'sticky', top: 0, zIndex: 20, flexShrink: 0,
+          gap: 12,
         }}>
-          <div style={{ fontSize: 14, fontWeight: 500, color: C.textDark }}>
-            {NAV.find(n => n.id === page)?.label ?? 'Dashboard'}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+            {isMobile && (
+              <button
+                onClick={() => setSidebarOpen(true)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.textLight, display: 'flex', padding: 4, flexShrink: 0 }}
+              >
+                <Menu size={20} />
+              </button>
+            )}
+            <div style={{ fontSize: 14, fontWeight: 500, color: C.textDark, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {NAV.find(n => n.id === page)?.label ?? 'Dashboard'}
+            </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-            {/* Balance */}
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 11, color: C.textLight, fontWeight: 400 }}>Operating balance</div>
-              <div style={{ fontSize: 14, fontWeight: 500, color: C.textDark }}>{fmtAED(ACCOUNT_BALANCE)}</div>
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 12 : 20, flexShrink: 0 }}>
+            {/* Balance — hidden on mobile */}
+            {!isMobile && (
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 11, color: C.textLight, fontWeight: 400 }}>Operating balance</div>
+                <div style={{ fontSize: 14, fontWeight: 500, color: C.textDark }}>{fmtAED(ACCOUNT_BALANCE)}</div>
+              </div>
+            )}
 
             {/* Bell */}
             <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.textLight, display: 'flex', padding: 4, borderRadius: 6 }}>
@@ -210,19 +274,12 @@ export default function App() {
             </button>
 
             {/* Avatar */}
-            <div style={{
-              width: 32, height: 32, borderRadius: '50%',
-              background: C.purple, color: '#fff',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 11, fontWeight: 500, cursor: 'pointer', flexShrink: 0,
-            }}>
-              {founder.initials}
-            </div>
+            <Avatar seed={founder.name} size={32} style={{ cursor: 'pointer' }} />
           </div>
         </header>
 
         {/* Page content */}
-        <main style={{ flex: 1, padding: '32px 36px', overflowY: 'auto', background: '#fff' }}>
+        <main style={{ flex: 1, padding: isMobile ? '20px 16px' : '32px 36px', overflowY: 'auto', overflowX: 'hidden', background: '#fff' }}>
           <div key={page} style={{ animation: 'pageFade 200ms ease-out' }}>
             {page === 'dashboard' && <Dashboard {...appState} />}
             {page === 'cards' && <Cards {...appState} />}

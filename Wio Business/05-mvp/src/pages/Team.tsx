@@ -1,6 +1,7 @@
 import React from 'react'
 import { TEAM, fmtAED } from '../data'
 import type { AppState } from '../App'
+import Avatar from '../components/Avatar'
 
 const C = {
   purple: '#5700FF',
@@ -28,7 +29,7 @@ export default function Team({ cards, transactions }: AppState) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       {/* Column headers */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.6fr 1fr 1.4fr', gap: 16, padding: '0 0 12px', borderBottom: `1px solid ${C.border}` }}>
+      <div className="team-header" style={{ display: 'grid', gridTemplateColumns: '2fr 1.6fr 1fr 1.4fr', gap: 16, padding: '0 0 12px', borderBottom: `1px solid ${C.border}` }}>
         {['Member', 'Card / Utilization', 'Cards', 'Spend this month'].map((h, i) => (
           <div key={h} style={{ fontSize: 10, fontWeight: 500, color: C.textLight, textTransform: 'uppercase', letterSpacing: '0.07em', textAlign: i === 3 ? 'right' : 'left' }}>
             {h}
@@ -42,6 +43,7 @@ export default function Team({ cards, transactions }: AppState) {
         return (
           <div
             key={member.id}
+            className="team-row"
             style={{
               display: 'grid', gridTemplateColumns: '2fr 1.6fr 1fr 1.4fr', gap: 16, alignItems: 'center',
               padding: '20px 0',
@@ -50,15 +52,7 @@ export default function Team({ cards, transactions }: AppState) {
           >
             {/* Member */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{
-                width: 36, height: 36, borderRadius: '50%',
-                background: member.isFounder ? C.navy : C.purple,
-                color: '#fff',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 12, fontWeight: 500, flexShrink: 0,
-              }}>
-                {member.initials}
-              </div>
+              <Avatar seed={member.name} size={36} />
               <div>
                 <div style={{ fontSize: 13, fontWeight: 500, color: C.textDark, display: 'flex', alignItems: 'center', gap: 6 }}>
                   {member.name}

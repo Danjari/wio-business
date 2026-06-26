@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { Shield, User, Check, X, CheckCircle2 } from 'lucide-react'
 import { TEAM, APPROVAL_RULES, fmtAED, fmtDate, type ProcessedApproval } from '../data'
 import type { AppState } from '../App'
+import Avatar from '../components/Avatar'
 
 const C = {
   purple: '#5700FF',
@@ -106,9 +107,7 @@ export default function Approvals({ approvals, setApprovals, processed, setProce
                       <div style={{ fontSize: 20, fontWeight: 500, color: C.textDark, marginBottom: 2 }}>{item.merchant}</div>
                       <div style={{ fontSize: 26, fontWeight: 500, color: C.textDark, marginBottom: 10 }}>{fmtAED(item.amount)}</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ width: 22, height: 22, borderRadius: '50%', background: C.purple, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 500 }}>
-                          {requester?.initials}
-                        </div>
+                        <Avatar seed={requester?.name ?? ''} size={22} />
                         <span style={{ fontSize: 12, color: C.textMid }}>{requester?.name} · {requester?.role}</span>
                       </div>
                       {item.note && (

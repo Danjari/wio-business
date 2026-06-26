@@ -284,7 +284,7 @@ export default function Cards({ cards, setCards, transactions, navigate, showToa
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 24 }}>
+      <div className="cards-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 24 }}>
         {cards.map((card, idx) => {
           const holder = TEAM.find(t => t.id === card.holderId)
           const pct = Math.min((card.spent / card.limit) * 100, 100)

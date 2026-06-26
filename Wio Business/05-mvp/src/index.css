@@ -7,3 +7,20 @@ input, select, textarea, button { font-family: inherit; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 4px; }
 * { scrollbar-width: thin; scrollbar-color: #E5E7EB transparent; }
+@media (max-width: 767px) {
+  body { overflow-x: hidden; }
+  /* Dashboard KPI strip: 2-column on mobile */
+  .kpi-strip { flex-wrap: wrap !important; }
+  .kpi-strip > * { flex: 1 1 calc(50% - 1px) !important; padding: 0 0 20px 0 !important; border-right: none !important; }
+  .kpi-strip > *:nth-child(odd) { padding-right: 16px !important; }
+  /* Dashboard body: single column */
+  .dash-body { grid-template-columns: 1fr !important; gap: 32px !important; }
+  /* Team grid: collapse columns */
+  .team-header { display: none !important; }
+  .team-row { grid-template-columns: 1fr 1fr !important; }
+  .team-row > *:nth-child(2) { display: none !important; }
+  /* Tables: horizontal scroll */
+  .table-scroll { overflow-x: auto !important; }
+  /* Cards grid: single column */
+  .cards-grid { grid-template-columns: 1fr !important; }
+}

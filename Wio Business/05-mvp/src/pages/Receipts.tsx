@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { Upload, CheckCircle, MessageCircle, X } from 'lucide-react'
 import { TEAM, ALL_CATEGORIES, fmtAED, fmtDate } from '../data'
 import type { AppState } from '../App'
+import Avatar from '../components/Avatar'
 
 const C = {
   purple: '#5700FF',
@@ -161,9 +162,7 @@ export default function Receipts({ transactions, setTransactions, cards, showToa
               <div key={tx.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: 16, alignItems: 'center', padding: '18px 0', borderBottom: idx < filtered.length - 1 ? `1px solid ${C.border}` : 'none' }}>
                 {/* Merchant + holder */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 32, height: 32, borderRadius: '50%', background: C.purple, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 500, flexShrink: 0 }}>
-                    {holder?.initials ?? '?'}
-                  </div>
+                  <Avatar seed={holder?.name ?? ''} size={32} />
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 500, color: C.textDark }}>{tx.merchant}</div>
                     <div style={{ fontSize: 11, color: C.textLight }}>{holder?.name} · {tx.category}</div>
