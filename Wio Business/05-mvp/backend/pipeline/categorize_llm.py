@@ -1,5 +1,5 @@
 """
-LLM-based expense categorizer using Claude Haiku.
+LLM-based expense categorizer using Gemini Flash.
 
 Used in two contexts:
 1. Production pipeline: both this and categorize_rules.py run on every receipt;
@@ -7,8 +7,8 @@ Used in two contexts:
 2. Benchmark: run_categorization.py calls this on all 967 merchant names from the
    fullDataset and compares agreement with the rule-based method.
 
-Model: claude-haiku-4-5-20251001 — cheapest capable Claude model, sufficient for
-single-field classification tasks.
+Model: gemini-3.0-flash — fast, cheap, sufficient for single-field classification.
+Update GEMINI_CATEGORIZE_MODEL in .env to override (e.g. gemini-3.5-flash).
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ import json
 import os
 from typing import Tuple
 
-import anthropic
+import google.generativeai as genai
 
 CATEGORIES = [
     "Travel",
@@ -31,60 +31,56 @@ CATEGORIES = [
     "Fuel",
 ]
 
+_MODEL_ID = os.getenv("GEMINI_CATEGORIZE_MODEL", "gemini-3.0-flash")
+
 _SYSTEM = (
     "You are an expense categorization engine for a UAE SME. "
-    "Given a merchant name, return the most appropriate expense category. "
+    "Given a merchant name, return the most appropriate expense category.\n\n"
     f"Available categories: {', '.join(CATEGORIES)}.\n\n"
     'Return ONLY valid JSON: {"category": "<category>", "confidence": <0.0-1.0>}\n'
     "Set confidence below 0.9 if the merchant name is ambiguous or unknown."
 )
 
-# Few-shot examples covering UAE + Malaysian merchant types present in the dataset
-_FEW_SHOT: list[dict] = [
-    {"role": "user", "content": "Merchant: EMIRATES AIRLINES"},
-    {"role": "assistant", "content": '{"category": "Travel", "confidence": 0.99}'},
-    {"role": "user", "content": "Merchant: ROTANA HOTEL ABU DHABI"},
-    {"role": "assistant", "content": '{"category": "Travel", "confidence": 0.99}'},
-    {"role": "user", "content": "Merchant: PETRONAS"},
-    {"role": "assistant", "content": '{"category": "Fuel", "confidence": 0.99}'},
-    {"role": "user", "content": "Merchant: RESTORAN WAN SHENG"},
-    {"role": "assistant", "content": '{"category": "Client Meals", "confidence": 0.97}'},
-    {"role": "user", "content": "Merchant: 99 SPEED MART S/B"},
-    {"role": "assistant", "content": '{"category": "Office Supplies", "confidence": 0.85}'},
-    {"role": "user", "content": "Merchant: GOOGLE ADS"},
-    {"role": "assistant", "content": '{"category": "Advertising", "confidence": 0.99}'},
-    {"role": "user", "content": "Merchant: HUBSPOT"},
-    {"role": "assistant", "content": '{"category": "SaaS Tools", "confidence": 0.99}'},
-    {"role": "user", "content": "Merchant: TNB"},
-    {"role": "assistant", "content": '{"category": "Utilities", "confidence": 0.97}'},
-    {"role": "user", "content": "Merchant: GSC CINEMA"},
-    {"role": "assistant", "content": '{"category": "Entertainment", "confidence": 0.98}'},
-    {"role": "user", "content": "Merchant: GITEX GLOBAL"},
-    {"role": "assistant", "content": '{"category": "Events", "confidence": 0.97}'},
-]
+# Few-shot examples packed into the user turn (Gemini doesn't use separate system messages in the same way)
+_FEW_SHOT = """Examples:
+Merchant: EMIRATES AIRLINES → {"category": "Travel", "confidence": 0.99}
+Merchant: ROTANA HOTEL ABU DHABI → {"category": "Travel", "confidence": 0.99}
+Merchant: PETRONAS → {"category": "Fuel", "confidence": 0.99}
+Merchant: RESTORAN WAN SHENG → {"category": "Client Meals", "confidence": 0.97}
+Merchant: 99 SPEED MART S/B → {"category": "Office Supplies", "confidence": 0.85}
+Merchant: GOOGLE ADS → {"category": "Advertising", "confidence": 0.99}
+Merchant: HUBSPOT → {"category": "SaaS Tools", "confidence": 0.99}
+Merchant: TNB → {"category": "Utilities", "confidence": 0.97}
+Merchant: GSC CINEMA → {"category": "Entertainment", "confidence": 0.98}
+Merchant: GITEX GLOBAL → {"category": "Events", "confidence": 0.97}
+
+"""
+
+_DEFAULT = "Office Supplies"
 
 
 def categorize(merchant: str) -> Tuple[str, float]:
     """
-    Classify a merchant name using Claude Haiku.
+    Classify a merchant name using Gemini Flash.
 
     Returns:
         (category, confidence)
     """
-    client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-
-    messages = _FEW_SHOT + [
-        {"role": "user", "content": f"Merchant: {merchant}"}
-    ]
-
-    response = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=64,
-        system=_SYSTEM,
-        messages=messages,
+    genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+    model = genai.GenerativeModel(
+        model_name=_MODEL_ID,
+        system_instruction=_SYSTEM,
+        generation_config=genai.GenerationConfig(
+            response_mime_type="application/json",
+            max_output_tokens=64,
+            temperature=0.0,
+        ),
     )
 
-    raw = response.content[0].text.strip()
+    prompt = _FEW_SHOT + f"Merchant: {merchant}"
+    response = model.generate_content(prompt)
+    raw = response.text.strip()
+
     try:
         result = json.loads(raw)
         category = str(result.get("category", _DEFAULT))
@@ -94,6 +90,3 @@ def categorize(merchant: str) -> Tuple[str, float]:
         return category, confidence
     except (json.JSONDecodeError, KeyError, ValueError, TypeError):
         return _DEFAULT, 0.5
-
-
-_DEFAULT = "Office Supplies"

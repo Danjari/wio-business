@@ -3,8 +3,8 @@ Full receipt processing pipeline orchestrator.
 
 Steps:
   1. AWS Textract extraction (primary)
-  2. Claude Haiku text fallback (if Textract confidence < threshold)
-  3. Claude Sonnet vision fallback (if Haiku confidence < 0.99)
+  2. Gemini Flash text fallback (if Textract confidence < threshold)
+  3. Gemini Flash vision fallback (if text LLM confidence < 0.99)
   4. Run both categorizers (rules + LLM) — results stored for comparison
   5. Transaction matching (RapidFuzz)
   6. Update Convex: match transaction or create pending approval

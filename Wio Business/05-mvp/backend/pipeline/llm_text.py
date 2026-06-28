@@ -1,12 +1,10 @@
 """
-Claude Haiku text-only fallback for Textract extractions with missing or low-confidence fields.
+Gemini Flash text-only fallback for Textract extractions with missing or low-confidence fields.
 
-This module receives the raw text output from Textract (which contains all detected text
-even when structured fields weren't parsed) and asks Claude Haiku to extract the
-merchant, total, and date from it.
+Receives the raw text output from Textract and asks Gemini Flash to extract the
+merchant, total, and date from it. No image is sent — only the text.
 
-No image is sent — only the text. This is cheaper than vision and stays compliant
-with data minimization principles.
+Model: gemini-3.0-flash — override with GEMINI_TEXT_MODEL in .env.
 """
 
 from __future__ import annotations
@@ -16,12 +14,14 @@ import os
 from dataclasses import dataclass
 from typing import Optional
 
-import anthropic
+import google.generativeai as genai
+
+_MODEL_ID = os.getenv("GEMINI_TEXT_MODEL", "gemini-3.0-flash")
 
 _SYSTEM = """You are an expense receipt data extractor.
 Given raw OCR text from a receipt, extract the merchant name, total amount paid, and date.
 
-Return ONLY valid JSON with this shape:
+Return ONLY valid JSON:
 {
   "merchant": "<business name or null>",
   "total": <number or null>,
@@ -48,25 +48,26 @@ class LLMTextResult:
 
 def extract_from_text(raw_text: str) -> LLMTextResult:
     """
-    Extract receipt fields from raw OCR text using Claude Haiku.
+    Extract receipt fields from raw OCR text using Gemini Flash.
     Raises RuntimeError on API error.
     """
     if not raw_text.strip():
         return LLMTextResult(confidence=0.0)
 
-    client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-
-    # Truncate very long texts to avoid token waste (receipts shouldn't need more than this)
-    truncated = raw_text[:3000]
-
-    response = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=256,
-        system=_SYSTEM,
-        messages=[{"role": "user", "content": f"Receipt text:\n{truncated}"}],
+    genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+    model = genai.GenerativeModel(
+        model_name=_MODEL_ID,
+        system_instruction=_SYSTEM,
+        generation_config=genai.GenerationConfig(
+            response_mime_type="application/json",
+            max_output_tokens=256,
+            temperature=0.0,
+        ),
     )
 
-    raw = response.content[0].text.strip()
+    truncated = raw_text[:3000]
+    response = model.generate_content(f"Receipt text:\n{truncated}")
+    raw = response.text.strip()
     return _parse(raw)
 
 

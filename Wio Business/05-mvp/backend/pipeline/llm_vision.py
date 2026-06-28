@@ -1,26 +1,32 @@
 """
-Claude Sonnet vision fallback — last resort when Textract + Haiku text both fail.
+Gemini Flash vision fallback — last resort when Textract + text LLM both fail.
+
+Gemini Flash natively supports image input — no base64 encoding required, just open
+the file with PIL and pass it to generate_content().
+
+Model: gemini-3.0-flash — override with GEMINI_VISION_MODEL in .env.
 
 IMPORTANT — REGULATORY NOTE:
-Sending an image to this endpoint means the receipt image leaves the UAE/Gulf region
-and is processed by Anthropic's infrastructure in the US. For production deployments
-under CBUAE oversight, this requires:
-  - A data processing agreement (DPA) with Anthropic, OR
-  - Replacement with an UAE/Gulf-region-compliant vision endpoint
-    (e.g. Azure OpenAI with UAE data residency commitments)
-This flag should be logged in the audit trail every time this function is called.
+Sending an image to this endpoint means the receipt image is processed by Google's
+infrastructure. For production deployments under CBUAE oversight, this requires:
+  - A data processing agreement (DPA) with Google Cloud, OR
+  - Replacement with a UAE/Gulf-region-compliant vision endpoint
+    (e.g. Google Cloud Vertex AI with data residency in UAE)
+This flag is logged in the audit trail every time this function is called.
 """
 
 from __future__ import annotations
 
-import base64
 import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-import anthropic
+import google.generativeai as genai
+from PIL import Image
+
+_MODEL_ID = os.getenv("GEMINI_VISION_MODEL", "gemini-3.0-flash")
 
 _SYSTEM = """You are an expense receipt data extractor.
 Extract the merchant name, total amount paid, and date from this receipt image.
@@ -43,51 +49,32 @@ class LLMVisionResult:
     date: Optional[str] = None
     confidence: float = 0.0
     raw_response: str = ""
-    regulatory_flag: bool = True  # always True — image left UAE region
+    regulatory_flag: bool = True  # always True — image processed by external API
 
 
 def extract_from_image(image_path: str) -> LLMVisionResult:
     """
-    Extract receipt fields from an image using Claude Sonnet vision.
+    Extract receipt fields from an image using Gemini Flash vision.
     Raises RuntimeError on API error.
     """
     path = Path(image_path)
     if not path.exists():
         raise RuntimeError(f"Image not found: {image_path}")
 
-    with open(path, "rb") as f:
-        image_data = base64.standard_b64encode(f.read()).decode("utf-8")
-
-    # Detect media type from extension
-    ext = path.suffix.lower()
-    media_type_map = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".gif": "image/gif", ".webp": "image/webp"}
-    media_type = media_type_map.get(ext, "image/jpeg")
-
-    client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=256,
-        system=_SYSTEM,
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": media_type,
-                            "data": image_data,
-                        },
-                    },
-                    {"type": "text", "text": "Extract the receipt data."},
-                ],
-            }
-        ],
+    genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+    model = genai.GenerativeModel(
+        model_name=_MODEL_ID,
+        system_instruction=_SYSTEM,
+        generation_config=genai.GenerationConfig(
+            response_mime_type="application/json",
+            max_output_tokens=256,
+            temperature=0.0,
+        ),
     )
 
-    raw = response.content[0].text.strip()
+    image = Image.open(path)
+    response = model.generate_content(["Extract the receipt data.", image])
+    raw = response.text.strip()
     return _parse(raw)
 
 
