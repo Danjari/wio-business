@@ -1,5 +1,5 @@
 """
-Send reply messages back to the Telegram user.
+Send reply messages back to the Slack user/channel.
 """
 
 from __future__ import annotations
@@ -7,25 +7,20 @@ from __future__ import annotations
 import logging
 import os
 
-import httpx
+from slack_sdk import WebClient
+from slack_sdk.errors import SlackApiError
 
 logger = logging.getLogger(__name__)
 
-_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-_BASE = f"https://api.telegram.org/bot{_BOT_TOKEN}"
+_client = WebClient(token=os.getenv("SLACK_BOT_TOKEN", ""))
 
 
-def send_message(chat_id: int | str, text: str) -> None:
-    """Send a plain text message to a Telegram chat."""
-    if not _BOT_TOKEN:
-        logger.warning("TELEGRAM_BOT_TOKEN not set — skipping notify")
+def send_message(channel: str, text: str) -> None:
+    """Post a plain text message to a Slack channel or DM."""
+    if not os.getenv("SLACK_BOT_TOKEN"):
+        logger.warning("SLACK_BOT_TOKEN not set — skipping notify")
         return
     try:
-        resp = httpx.post(
-            f"{_BASE}/sendMessage",
-            json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
-            timeout=10.0,
-        )
-        resp.raise_for_status()
-    except Exception as exc:
-        logger.error(f"Failed to send Telegram message to {chat_id}: {exc}")
+        _client.chat_postMessage(channel=channel, text=text)
+    except SlackApiError as exc:
+        logger.error(f"Failed to send Slack message to {channel}: {exc}")
