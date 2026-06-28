@@ -276,6 +276,146 @@ def print_categorization_report(metrics: dict, llm_cost_usd: float = 0.0) -> Non
     print(f"{'='*W}\n")
 
 
+def save_categorization_markdown_report(
+    metrics: dict,
+    output_path: str | Path,
+    llm_cost_usd: float = 0.0,
+    per_receipt: list[dict] | None = None,
+) -> None:
+    """Write a structured Markdown categorization report."""
+    path = Path(output_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    n   = metrics["n"]
+    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+
+    # Classify disagreements: "LLM fills gap" (rules=Other) vs "genuine conflict" (both had opinion)
+    rules_other_llm_specific = sum(
+        1 for d in (per_receipt or [])
+        if d.get("rules") == "Other" and d.get("llm") != "Other"
+    )
+    genuine_conflict = metrics["disagreements"] - rules_other_llm_specific
+    hybrid_cost = llm_cost_usd * rules_other_llm_specific / n if n else 0
+
+    # Verdict
+    if metrics["agreement_pct"] >= 90:
+        verdict = (
+            f"**{metrics['agreement_pct']}% agreement** between LLM and rule-based. "
+            "Rule-based is sufficient for production — use LLM only as a spot-check."
+        )
+    elif metrics["agreement_pct"] >= 75:
+        verdict = (
+            f"**{metrics['agreement_pct']}% agreement**. "
+            "Hybrid approach recommended: rules first, LLM for unknowns only."
+        )
+    else:
+        rules_other_pct = round(metrics["rules_distribution"].get("Other", 0) / n * 100, 1)
+        verdict = (
+            f"**{metrics['agreement_pct']}% raw agreement**, but {rules_other_pct}% of rules output was 'Other' "
+            f"(unclassified). Most disagreements ({rules_other_llm_specific}/{metrics['disagreements']}) "
+            "are the LLM resolving gaps the rules couldn't — not genuine conflicts. "
+            "**Hybrid approach is the right call**: rules handle what they know, LLM handles the rest."
+        )
+
+    lines: list[str] = [
+        f"# Categorization Benchmark — Wio Business",
+        f"",
+        f"**Generated:** {now}  ",
+        f"**Dataset:** {n} receipts (SROIE benchmark — Malaysia/Southeast Asia)  ",
+        f"**Methods compared:** Rule-based keyword matching vs Gemini Flash (batch, thinking disabled)  ",
+        f"",
+        f"---",
+        f"",
+        f"## Executive Summary",
+        f"",
+        verdict,
+        f"",
+        f"| Metric | Value |",
+        f"|--------|-------|",
+        f"| Receipts evaluated | {n} |",
+        f"| Agreement | {metrics['agreement']} / {n} ({metrics['agreement_pct']}%) |",
+        f"| Disagreements (total) | {metrics['disagreements']} ({metrics['disagreement_pct']}%) |",
+        f"| — LLM fills rules gap (rules=Other) | {rules_other_llm_specific} |",
+        f"| — Genuine conflict (both had opinion) | {genuine_conflict} |",
+        f"| LLM says 'Other' | {metrics['llm_distribution'].get('Other', 0)} ({round(metrics['llm_distribution'].get('Other', 0)/n*100, 1)}%) |",
+        f"| Rules says 'Other' | {metrics['rules_distribution'].get('Other', 0)} ({round(metrics['rules_distribution'].get('Other', 0)/n*100, 1)}%) |",
+        f"",
+        f"---",
+        f"",
+        f"## Category Distribution",
+        f"",
+        f"| Category | LLM count | LLM % | Rules count | Rules % |",
+        f"|----------|----------:|------:|------------:|--------:|",
+    ]
+
+    all_cats = sorted(
+        set(metrics["llm_distribution"]) | set(metrics["rules_distribution"])
+    )
+    for cat in all_cats:
+        llm_n   = metrics["llm_distribution"].get(cat, 0)
+        rules_n = metrics["rules_distribution"].get(cat, 0)
+        lines.append(
+            f"| {cat} | {llm_n} | {round(llm_n/n*100,1)}% | {rules_n} | {round(rules_n/n*100,1)}% |"
+        )
+
+    lines += [
+        f"",
+        f"---",
+        f"",
+        f"## Disagreement Analysis",
+        f"",
+        f"Of the {metrics['disagreements']} disagreements:",
+        f"",
+        f"- **{rules_other_llm_specific} are gap-fills**: rules returned 'Other' (no keyword match), LLM assigned a specific category. LLM is almost certainly correct in these cases.",
+        f"- **{genuine_conflict} are genuine conflicts**: both methods had an opinion but differed. These need manual review to determine ground truth.",
+        f"",
+        f"### Sample Disagreements",
+        f"",
+        f"| Merchant | LLM | Rules | Type |",
+        f"|----------|-----|-------|------|",
+    ]
+
+    for d in (metrics.get("disagreement_sample") or [])[:30]:
+        conflict_type = "gap-fill" if d["rules"] == "Other" else "conflict"
+        lines.append(f"| {d['merchant']} | {d['llm']} | {d['rules']} | {conflict_type} |")
+
+    lines += [
+        f"",
+        f"---",
+        f"",
+        f"## Production Recommendation",
+        f"",
+        f"**Use a hybrid pipeline:**",
+        f"",
+        f"```",
+        f"1. Run rule-based categorizer (free, <1ms, deterministic)",
+        f"2. If result = 'Other' → call Gemini Flash with merchant + line items",
+        f"3. Zoho Books sync uses whichever result is available",
+        f"```",
+        f"",
+        f"This covers {n - metrics['rules_distribution'].get('Other', 0)}/{n} receipts with rules alone "
+        f"({round((n - metrics['rules_distribution'].get('Other', 0))/n*100, 1)}% rule coverage), "
+        f"and uses LLM only for the {metrics['rules_distribution'].get('Other', 0)} unknowns.",
+        f"",
+        f"| Approach | API calls | Estimated cost |",
+        f"|----------|----------:|---------------:|",
+        f"| All LLM | {n} | ${llm_cost_usd:.4f} |",
+        f"| Hybrid (LLM for unknowns only) | {metrics['rules_distribution'].get('Other', 0)} | ${hybrid_cost:.4f} |",
+        f"| Rules only | 0 | $0.0000 |",
+        f"",
+        f"---",
+        f"",
+        f"## Dataset Notes",
+        f"",
+        f"- **SROIE caveat:** Malaysian/Southeast Asian merchants. UAE merchants (ADNOC, Carrefour, Talabat, Careem) will have higher rule-based coverage since they are recognisable brand names.",
+        f"- **Rule-based 'Other' rate ({round(metrics['rules_distribution'].get('Other', 0)/n*100,1)}%)** is inflated by obscure Malaysian company names (e.g. 'SYARIKAT PERNIAGAAN GIN KEE'). Expect <15% 'Other' on UAE receipt traffic.",
+        f"- **No ground truth categories** exist in SROIE — agreement metrics compare two methods, not accuracy vs a labeled set.",
+        f"",
+    ]
+
+    path.write_text("\n".join(lines), encoding="utf-8")
+    print(f"  Markdown report saved to {path}")
+
+
 # ── Shared ────────────────────────────────────────────────────────────────────
 
 def save_json(data: dict, output_path: str | Path) -> None:

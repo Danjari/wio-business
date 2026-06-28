@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 import boto3
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError, EndpointConnectionError, BotoCoreError
 
 
 TEXTRACT_REGION = os.getenv("AWS_REGION", "me-south-1")
@@ -36,6 +36,7 @@ class ExtractResult:
     currency: Optional[str] = None    # ISO code detected from total symbol
     date: Optional[str] = None
     raw_text: str = ""                # all detected text joined, used by LLM fallback
+    line_items: list = field(default_factory=list)  # ITEM-type descriptions for categorization
     # Per-field confidence scores (0–100, Textract scale)
     total_confidence: float = 0.0
     merchant_confidence: float = 0.0
@@ -62,6 +63,10 @@ def extract_receipt(image_path: str) -> ExtractResult:
         response = client.analyze_expense(Document={"Bytes": image_bytes})
     except ClientError as exc:
         raise RuntimeError(f"Textract API error: {exc}") from exc
+    except EndpointConnectionError as exc:
+        raise RuntimeError(f"Textract unreachable (network/DNS): {exc}") from exc
+    except BotoCoreError as exc:
+        raise RuntimeError(f"Textract botocore error: {exc}") from exc
     except FileNotFoundError as exc:
         raise RuntimeError(f"Image not found: {image_path}") from exc
 
@@ -140,10 +145,18 @@ def parse_textract_response(response: dict) -> ExtractResult:
 
         for group in doc.get("LineItemGroups", []):
             for item in group.get("LineItems", []):
+                item_desc: Optional[str] = None
                 for expense_field in item.get("LineItemExpenseFields", []):
+                    ftype = expense_field.get("Type", {}).get("Text", "").upper()
                     val = (expense_field.get("ValueDetection", {}).get("Text") or "").strip()
-                    if val:
-                        text_parts.append(val)
+                    if not val:
+                        continue
+                    text_parts.append(val)
+                    # Capture ITEM descriptions separately for categorization context
+                    if ftype == "ITEM" and item_desc is None:
+                        item_desc = val
+                if item_desc:
+                    result.line_items.append(item_desc)
 
     # Use the highest-priority tier that returned candidates
     total_conf: float = 0.0

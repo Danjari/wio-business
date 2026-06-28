@@ -180,22 +180,23 @@ def run(
     result.extraction_method = extraction_method
 
     # ── Step 4: Categorization (both methods, always) ────────────────────────
+    line_items = textract_result.line_items if textract_result else []
     if merchant:
-        cat_rules, cat_method, cat_conf = categorize_rules.categorize(merchant)
+        cat_rules, cat_method, cat_conf = categorize_rules.categorize(merchant, items=line_items)
         result.category_rules = cat_rules
-        result.log("categorize_rules", f"category={cat_rules} method={cat_method} conf={cat_conf:.2f}")
+        result.log("categorize_rules", f"category={cat_rules} method={cat_method} conf={cat_conf:.2f} items={len(line_items)}")
 
         try:
-            cat_llm, llm_conf = categorize_llm.categorize(merchant)
+            cat_llm, llm_conf = categorize_llm.categorize(merchant, items=line_items)
             result.category_llm = cat_llm
             result.log("categorize_llm", f"category={cat_llm} conf={llm_conf:.2f}")
         except Exception as exc:
             result.log("categorize_llm_error", str(exc))
             cat_llm = cat_rules
 
-        result.category_used = cat_rules  # rules result used in production
+        result.category_used = cat_llm
     else:
-        result.category_rules = result.category_llm = result.category_used = "Office Supplies"
+        result.category_rules = result.category_llm = result.category_used = "Other"
         result.log("categorize_skipped", "no merchant name extracted")
 
     # ── Step 5: Transaction matching ─────────────────────────────────────────

@@ -22,18 +22,20 @@ _MODEL_PATH = _HERE / "tfidf_model.pkl"
 
 # Normalise internal key names → display names matching data.ts ALL_CATEGORIES
 _KEY_TO_DISPLAY = {
-    "TRAVEL": "Travel",
-    "FUEL": "Fuel",
-    "UTILITIES": "Utilities",
-    "ADVERTISING": "Advertising",
-    "SAAS_TOOLS": "SaaS Tools",
-    "CLIENT_MEALS": "Client Meals",
-    "ENTERTAINMENT": "Entertainment",
-    "EVENTS": "Events",
-    "OFFICE_SUPPLIES": "Office Supplies",
+    "TRAVEL_TRANSPORT":      "Travel & Transport",
+    "MEALS_ENTERTAINMENT":   "Meals & Entertainment",
+    "TECHNOLOGY_SOFTWARE":   "Technology & Software",
+    "MARKETING_ADVERTISING": "Marketing & Advertising",
+    "PROFESSIONAL_SERVICES": "Professional Services",
+    "OFFICE_STATIONERY":     "Office & Stationery",
+    "UTILITIES_TELECOM":     "Utilities & Telecom",
+    "FUEL_VEHICLE":          "Fuel & Vehicle",
+    "HEALTHCARE_MEDICAL":    "Healthcare & Medical",
+    "EVENTS_TRAINING":       "Events & Training",
+    "RENT_FACILITIES":       "Rent & Facilities",
 }
 
-_DEFAULT_CATEGORY = "Office Supplies"
+_DEFAULT_CATEGORY = "Other"
 
 
 def _load_keyword_map() -> dict[str, str]:
@@ -47,26 +49,41 @@ def _load_keyword_map() -> dict[str, str]:
             continue
         display = _KEY_TO_DISPLAY.get(key, key.title())
         for kw in keywords:
-            flat[kw.upper().strip()] = display
+            # Do NOT strip() — trailing spaces are word-boundary guards (e.g. "DU " won't
+            # match "DUTY", "INN " won't match "THINNER"). Only strip leading whitespace.
+            flat[kw.upper().lstrip()] = display
     return flat
 
 
 _KEYWORD_MAP: dict[str, str] = _load_keyword_map()
 
 
-def categorize(merchant: str, extra_text: str = "") -> Tuple[str, str, float]:
+def categorize(
+    merchant: str,
+    items: list[str] | None = None,
+    extra_text: str = "",
+) -> Tuple[str, str, float]:
     """
     Classify a merchant name into an expense category.
+    Pass `items` (line item descriptions) to improve accuracy for ambiguous merchants.
 
     Returns:
         (category, method, confidence)
     """
-    text = (merchant + " " + extra_text).upper().strip()
+    items_text = " ".join(items) if items else ""
+    text = (merchant + " " + items_text + " " + extra_text).upper().strip()
 
-    # Tier 1 — keyword match
+    # Tier 1 — keyword match against merchant name only (high precision)
+    merchant_upper = merchant.upper()
     for keyword, category in _KEYWORD_MAP.items():
-        if keyword in text:
+        if keyword in merchant_upper:
             return category, "keyword", 1.0
+
+    # Tier 1b — keyword match against items if merchant didn't match (lower precision)
+    if items_text:
+        for keyword, category in _KEYWORD_MAP.items():
+            if keyword in text:
+                return category, "keyword_items", 0.85
 
     # Tier 2 — TF-IDF classifier
     if _MODEL_PATH.exists():

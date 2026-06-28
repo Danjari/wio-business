@@ -1,0 +1,12 @@
+app = "wio-receipt-bot"
+primary_region = "dxb"
+
+[build]
+
+[env]
+AWS_REGION = "me-south-1"
+
+[[vm]]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1
