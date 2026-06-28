@@ -86,12 +86,13 @@ def handle_event(event: dict, say, db: SupabaseClient | None) -> None:
 
 def _download_file(url: str) -> str:
     """Download a Slack file using the bot token. Returns temp file path."""
-    resp = httpx.get(
-        url,
-        headers={"Authorization": f"Bearer {_BOT_TOKEN}"},
-        timeout=30.0,
-        follow_redirects=True,
-    )
+    headers = {"Authorization": f"Bearer {_BOT_TOKEN}"}
+    # Slack redirects to a workspace-specific domain — re-add auth header manually
+    # because httpx strips it on cross-domain redirects (security default).
+    resp = httpx.get(url, headers=headers, timeout=30.0, follow_redirects=False)
+    if resp.status_code in (301, 302, 303, 307, 308):
+        location = resp.headers.get("location", "")
+        resp = httpx.get(location, headers=headers, timeout=30.0, follow_redirects=True)
     resp.raise_for_status()
 
     content_type = resp.headers.get("content-type", "")
