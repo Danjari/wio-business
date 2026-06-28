@@ -1,20 +1,22 @@
 """
-FastAPI application entry point.
+Wio Business Receipt Bot — Slack Socket Mode entry point.
 
-Exposes:
-  POST /webhook  — Telegram bot webhook receiver
+Run locally (no ngrok or public URL needed):
+    python main.py
 
-Run locally:
-    uvicorn main:app --reload --port 8000
-
-Set the Telegram webhook (replace <TOKEN> and <YOUR_NGROK_URL>):
-    curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=<YOUR_NGROK_URL>/webhook&secret_token=<TELEGRAM_WEBHOOK_SECRET>"
+Slack app setup:
+  1. api.slack.com/apps → Create app → From scratch
+  2. Settings → Socket Mode → Enable → generate App-Level Token (connections:write scope)
+     → set as SLACK_APP_TOKEN (xapp-...)
+  3. OAuth & Permissions → Bot Token Scopes:
+       chat:write, files:read, im:history, channels:history, groups:history
+  4. Event Subscriptions → Subscribe to bot events:
+       message.im, message.channels, message.groups
+  5. Install to workspace → copy Bot User OAuth Token → SLACK_BOT_TOKEN (xoxb-...)
 """
 
 from __future__ import annotations
 
-import hashlib
-import hmac
 import logging
 import os
 
@@ -22,8 +24,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+from slack_bolt import App
+from slack_bolt.adapter.socket_mode import SocketModeHandler
 
 from bot import handler
 from db_client import SupabaseClient
@@ -31,44 +33,24 @@ from db_client import SupabaseClient
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Wio Business Receipt Bot")
+app = App(token=os.getenv("SLACK_BOT_TOKEN", ""))
 
-_WEBHOOK_SECRET = os.getenv("TELEGRAM_WEBHOOK_SECRET", "")
-
-# Supabase client is initialised once at startup
 _db: SupabaseClient | None = None
+try:
+    _db = SupabaseClient()
+    logger.info("Supabase client initialised")
+except RuntimeError as exc:
+    logger.warning(f"Supabase not configured: {exc} — DB writes will be skipped")
 
 
-@app.on_event("startup")
-async def startup() -> None:
-    global _db
-    try:
-        _db = SupabaseClient()
-        logger.info("Supabase client initialised")
-    except RuntimeError as exc:
-        logger.warning(f"Supabase not configured: {exc} — receipt DB writes will be skipped")
+@app.event("message")
+def handle_message(event, say):
+    handler.handle_event(event, say=say, db=_db)
 
 
-@app.get("/health")
-async def health() -> dict:
-    return {"status": "ok", "supabase": _db is not None}
-
-
-@app.post("/webhook")
-async def telegram_webhook(request: Request) -> JSONResponse:
-    # Validate Telegram's secret token header
-    if _WEBHOOK_SECRET:
-        incoming_secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
-        if not hmac.compare_digest(incoming_secret, _WEBHOOK_SECRET):
-            raise HTTPException(status_code=403, detail="Invalid webhook secret")
-
-    update = await request.json()
-    logger.debug(f"Received update: {update.get('update_id')}")
-
-    # Process synchronously for simplicity in demo; use BackgroundTasks for production
-    try:
-        handler.handle_update(update, db=_db)
-    except Exception as exc:
-        logger.exception(f"Unhandled error in handle_update: {exc}")
-        # Always return 200 to Telegram — otherwise it retries indefinitely
-    return JSONResponse({"ok": True})
+if __name__ == "__main__":
+    app_token = os.getenv("SLACK_APP_TOKEN", "")
+    if not app_token:
+        raise RuntimeError("SLACK_APP_TOKEN must be set in .env")
+    logger.info("Starting Slack Socket Mode — no public URL needed")
+    SocketModeHandler(app, app_token).start()
