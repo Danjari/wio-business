@@ -1,10 +1,7 @@
 """
 Gemini Flash vision fallback — last resort when Textract + text LLM both fail.
 
-Gemini Flash natively supports image input — no base64 encoding required, just open
-the file with PIL and pass it to generate_content().
-
-Model: gemini-3.0-flash — override with GEMINI_VISION_MODEL in .env.
+Model: gemini-2.0-flash — override with GEMINI_VISION_MODEL in .env.
 
 IMPORTANT — REGULATORY NOTE:
 Sending an image to this endpoint means the receipt image is processed by Google's
@@ -23,10 +20,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from PIL import Image
 
-_MODEL_ID = os.getenv("GEMINI_VISION_MODEL", "gemini-3.0-flash")
+_MODEL_ID = os.getenv("GEMINI_VISION_MODEL", "gemini-2.0-flash")
 
 _SYSTEM = """You are an expense receipt data extractor.
 Extract the merchant name, total amount paid, and date from this receipt image.
@@ -61,21 +59,24 @@ def extract_from_image(image_path: str) -> LLMVisionResult:
     if not path.exists():
         raise RuntimeError(f"Image not found: {image_path}")
 
-    genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-    model = genai.GenerativeModel(
-        model_name=_MODEL_ID,
-        system_instruction=_SYSTEM,
-        generation_config=genai.GenerationConfig(
-            response_mime_type="application/json",
-            max_output_tokens=256,
-            temperature=0.0,
-        ),
-    )
-
+    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
     image = Image.open(path)
-    response = model.generate_content(["Extract the receipt data.", image])
-    raw = response.text.strip()
-    return _parse(raw)
+
+    try:
+        response = client.models.generate_content(
+            model=_MODEL_ID,
+            contents=["Extract the receipt data.", image],
+            config=types.GenerateContentConfig(
+                system_instruction=_SYSTEM,
+                response_mime_type="application/json",
+                max_output_tokens=256,
+                temperature=0.0,
+            ),
+        )
+    except Exception as exc:
+        raise RuntimeError(f"Gemini vision API error: {exc}") from exc
+
+    return _parse(response.text.strip())
 
 
 def _parse(raw: str) -> LLMVisionResult:
