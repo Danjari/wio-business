@@ -54,7 +54,7 @@ def find_match(
 
     for tx in transactions:
         # Skip already-receipted or non-approved transactions
-        if tx.get("hasReceipt"):
+        if tx.get("has_receipt"):
             continue
         if tx.get("status") not in ("approved", "pending_approval"):
             continue

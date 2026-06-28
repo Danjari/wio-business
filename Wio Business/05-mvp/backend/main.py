@@ -26,7 +26,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from bot import handler
-from convex_client import ConvexClient
+from db_client import SupabaseClient
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -35,23 +35,23 @@ app = FastAPI(title="Wio Business Receipt Bot")
 
 _WEBHOOK_SECRET = os.getenv("TELEGRAM_WEBHOOK_SECRET", "")
 
-# Convex client is initialised once at startup
-_convex: ConvexClient | None = None
+# Supabase client is initialised once at startup
+_db: SupabaseClient | None = None
 
 
 @app.on_event("startup")
 async def startup() -> None:
-    global _convex
+    global _db
     try:
-        _convex = ConvexClient()
-        logger.info("Convex client initialised")
+        _db = SupabaseClient()
+        logger.info("Supabase client initialised")
     except RuntimeError as exc:
-        logger.warning(f"Convex not configured: {exc} — receipt DB writes will be skipped")
+        logger.warning(f"Supabase not configured: {exc} — receipt DB writes will be skipped")
 
 
 @app.get("/health")
 async def health() -> dict:
-    return {"status": "ok", "convex": _convex is not None}
+    return {"status": "ok", "supabase": _db is not None}
 
 
 @app.post("/webhook")
@@ -67,7 +67,7 @@ async def telegram_webhook(request: Request) -> JSONResponse:
 
     # Process synchronously for simplicity in demo; use BackgroundTasks for production
     try:
-        handler.handle_update(update, convex=_convex)
+        handler.handle_update(update, db=_db)
     except Exception as exc:
         logger.exception(f"Unhandled error in handle_update: {exc}")
         # Always return 200 to Telegram — otherwise it retries indefinitely

@@ -19,7 +19,7 @@ from pathlib import Path
 import httpx
 
 from bot import notify
-from convex_client import ConvexClient
+from db_client import SupabaseClient
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ _CDN = f"https://api.telegram.org/file/bot{_BOT_TOKEN}"
 _DEMO_TEAM_MEMBER_ID = "t1"
 
 
-def handle_update(update: dict, convex: ConvexClient) -> None:
+def handle_update(update: dict, db: SupabaseClient) -> None:
     """
     Process a single Telegram update object.
     Called by the FastAPI webhook endpoint for each incoming update.
@@ -59,22 +59,21 @@ def handle_update(update: dict, convex: ConvexClient) -> None:
     try:
         image_path = _download_photo(file_id)
 
-        # Create receipt record in Convex
-        receipt_id = convex.create_receipt({
-            "botSource": "telegram",
-            "botUserId": str(message["from"]["id"]),
-            "teamMemberId": _DEMO_TEAM_MEMBER_ID,
+        # Create receipt record in Supabase
+        receipt_id = db.create_receipt({
+            "bot_source": "telegram",
+            "bot_user_id": str(message["from"]["id"]),
+            "team_member_id": _DEMO_TEAM_MEMBER_ID,
             "currency": "AED",
             "status": "pending_extraction",
-            "createdAt": int(time.time() * 1000),
-            "auditLog": [],
+            "audit_log": [],
         })
 
         # Fetch transaction pool for matching
         try:
-            transactions = convex.get_unreceipted_transactions()
+            transactions = db.get_unreceipted_transactions()
         except Exception as exc:
-            logger.warning(f"Could not fetch transactions from Convex: {exc}. Using empty list.")
+            logger.warning(f"Could not fetch transactions from Supabase: {exc}. Using empty list.")
             transactions = []
 
         # Import here to avoid circular imports at module load
@@ -87,7 +86,7 @@ def handle_update(update: dict, convex: ConvexClient) -> None:
             receipt_id=receipt_id,
             image_path=image_path,
             transactions=transactions,
-            convex_client=convex,
+            db=db,
             bot_notify_fn=_notify,
         )
 

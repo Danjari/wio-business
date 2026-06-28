@@ -7,7 +7,7 @@ Steps:
   3. Gemini Flash vision fallback (if text LLM confidence < 0.99)
   4. Run both categorizers (rules + LLM) — results stored for comparison
   5. Transaction matching (RapidFuzz)
-  6. Update Convex: match transaction or create pending approval
+  6. Update Supabase: match transaction or create pending approval
   7. Notify user via bot
 
 Returns a PipelineResult describing the outcome.
@@ -15,16 +15,14 @@ Returns a PipelineResult describing the outcome.
 
 from __future__ import annotations
 
-import os
 import time
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Optional
 
 from pipeline import extract, llm_text, llm_vision, categorize_rules, categorize_llm, match
 from pipeline.extract import ExtractResult
 
-VISION_CONFIDENCE_THRESHOLD = 0.99   # below this → ask for clearer photo
+VISION_CONFIDENCE_THRESHOLD = 0.99
 LLM_TEXT_CONFIDENCE_THRESHOLD = 0.99
 
 
@@ -50,14 +48,14 @@ def run(
     receipt_id: str,
     image_path: str,
     transactions: list[dict],
-    convex_client=None,    # injected; avoids circular import
-    bot_notify_fn=None,    # injected; callable(message: str)
+    db=None,              # SupabaseClient instance; injected to avoid circular import
+    bot_notify_fn=None,   # callable(message: str)
 ) -> PipelineResult:
     """
     Execute the full pipeline for one receipt image.
 
-    image_path: absolute path to a temp image file (caller must delete it afterward).
-    transactions: list of transaction dicts from Convex (hasReceipt=False candidates).
+    image_path: absolute path to a temp file (caller must delete it after this returns).
+    transactions: list of transaction rows from Supabase (has_receipt=False candidates).
     """
     result = PipelineResult(status="error")
     result.log("pipeline_start", f"receipt_id={receipt_id}")
@@ -69,7 +67,7 @@ def run(
     except RuntimeError as exc:
         result.error = str(exc)
         result.log("textract_error", str(exc))
-        _update_convex(convex_client, receipt_id, result)
+        _save(db, receipt_id, result)
         return result
 
     merchant = textract_result.merchant
@@ -77,15 +75,14 @@ def run(
     date = textract_result.date
     extraction_method = "textract"
 
-    # ── Step 2: Claude Haiku text fallback ───────────────────────────────────
+    # ── Step 2: Gemini Flash text fallback ────────────────────────────────────
     if not textract_result.high_confidence:
         result.log("llm_text_start", "textract confidence below threshold")
         try:
             text_result = llm_text.extract_from_text(textract_result.raw_text)
-            extraction_method = "textract+haiku"
+            extraction_method = "textract+gemini_text"
             result.log("llm_text_done", f"confidence={text_result.confidence:.2f}")
 
-            # Merge: take Haiku value when Textract didn't find the field
             if not merchant and text_result.merchant:
                 merchant = text_result.merchant
             if total is None and text_result.total is not None:
@@ -93,12 +90,12 @@ def run(
             if not date and text_result.date:
                 date = text_result.date
 
-            # ── Step 3: Claude Sonnet vision — last resort ────────────────────
+            # ── Step 3: Gemini Flash vision — last resort ─────────────────────
             if text_result.confidence < LLM_TEXT_CONFIDENCE_THRESHOLD:
-                result.log("llm_vision_start", "haiku confidence below threshold — REGULATORY NOTE: image leaves UAE region")
+                result.log("llm_vision_start", "text LLM confidence below threshold — REGULATORY NOTE: image leaves UAE region")
                 try:
                     vision_result = llm_vision.extract_from_image(image_path)
-                    extraction_method = "textract+haiku+vision"
+                    extraction_method = "textract+gemini_text+gemini_vision"
                     result.log("llm_vision_done", f"confidence={vision_result.confidence:.2f} regulatory_flag=True")
 
                     if not merchant and vision_result.merchant:
@@ -112,7 +109,7 @@ def run(
                         result.status = "needs_clarity"
                         result.extraction_method = extraction_method
                         result.log("needs_clarity", "vision confidence below 0.99")
-                        _update_convex(convex_client, receipt_id, result)
+                        _save(db, receipt_id, result)
                         if bot_notify_fn:
                             bot_notify_fn(
                                 "I couldn't read that receipt clearly enough to be confident in the amounts. "
@@ -122,7 +119,6 @@ def run(
 
                 except RuntimeError as exc:
                     result.log("llm_vision_error", str(exc))
-                    # Fall through — best effort with what we have
 
         except RuntimeError as exc:
             result.log("llm_text_error", str(exc))
@@ -144,10 +140,9 @@ def run(
             result.log("categorize_llm", f"category={cat_llm} conf={llm_conf:.2f}")
         except Exception as exc:
             result.log("categorize_llm_error", str(exc))
-            cat_llm = cat_rules  # fall back to rules result
+            cat_llm = cat_rules
 
-        # Production uses rule-based result; LLM stored for comparison
-        result.category_used = cat_rules
+        result.category_used = cat_rules  # rules result used in production
     else:
         result.category_rules = result.category_llm = result.category_used = "Office Supplies"
         result.log("categorize_skipped", "no merchant name extracted")
@@ -156,7 +151,7 @@ def run(
     if total is None:
         result.log("match_skipped", "no total extracted — cannot match")
         result.status = "needs_clarity"
-        _update_convex(convex_client, receipt_id, result)
+        _save(db, receipt_id, result)
         if bot_notify_fn:
             bot_notify_fn(
                 "I could read the receipt but couldn't determine the total amount. "
@@ -176,12 +171,12 @@ def run(
         result.matched_tx_id = match_result.transaction_id
         result.log("match_found", f"tx_id={match_result.transaction_id} score={match_result.merchant_score}")
 
-        if convex_client:
-            convex_client.update_transaction(
+        if db:
+            db.update_transaction(
                 match_result.transaction_id,
-                {"hasReceipt": True, "zohoSynced": True},
+                {"has_receipt": True, "zoho_synced": True},
             )
-            convex_client.update_receipt(receipt_id, result)
+            _save(db, receipt_id, result)
 
         if bot_notify_fn:
             bot_notify_fn(
@@ -194,31 +189,31 @@ def run(
         result.status = "unmatched_routed"
         result.log("match_not_found", "routing to approvals")
 
-        if convex_client:
-            # Determine approval level from APPROVAL_RULES thresholds
+        if db:
             required_level = _approval_level(total)
-            new_tx_id = convex_client.create_transaction({
+            new_tx_id = db.create_transaction({
                 "merchant": merchant or "Unknown Merchant",
                 "amount": total,
                 "date": date or "",
                 "category": result.category_used,
                 "status": "pending_approval",
-                "hasReceipt": True,
-                "zohoSynced": False,
-                "note": f"Auto-created from bot receipt — no matching transaction found",
-                "cardId": "c5",  # defaults to founder's petty cash card for demo
+                "has_receipt": True,
+                "zoho_synced": False,
+                "note": "Auto-created from Telegram bot receipt — no matching transaction found",
+                "card_id": "c5",  # founder's petty cash card — demo default
             })
-            convex_client.create_approval({
-                "txId": new_tx_id,
-                "requestedById": "t1",  # Sara (founder — hardcoded for demo)
+            db.create_approval({
+                "tx_id": new_tx_id,
+                "requested_by_id": "t1",  # Sara (founder — hardcoded for demo)
                 "amount": total,
                 "merchant": merchant or "Unknown Merchant",
                 "category": result.category_used,
-                "cardId": "c5",
+                "card_id": "c5",
                 "note": f"Receipt submitted via Telegram bot. Category: {result.category_used}.",
-                "requiredLevel": required_level,
+                "date": date or "",
+                "required_level": required_level,
             })
-            convex_client.update_receipt(receipt_id, result)
+            _save(db, receipt_id, result)
 
         if bot_notify_fn:
             bot_notify_fn(
@@ -230,9 +225,24 @@ def run(
     return result
 
 
+def _save(db, receipt_id: str, result: PipelineResult) -> None:
+    if not db:
+        return
+    db.update_receipt(receipt_id, {
+        "status": result.status,
+        "merchant": result.merchant,
+        "amount": result.total,
+        "date": result.date,
+        "category_rules": result.category_rules,
+        "category_llm": result.category_llm,
+        "category_used": result.category_used,
+        "extraction_method": result.extraction_method,
+        "matched_tx_id": result.matched_tx_id,
+        "audit_log": result.audit_log,
+    })
+
+
 def _approval_level(amount: float) -> str:
     if amount >= 5000:
         return "founder"
-    if amount >= 500:
-        return "manager"
-    return "manager"  # auto-approve threshold handled separately; always needs at least manager
+    return "manager"
