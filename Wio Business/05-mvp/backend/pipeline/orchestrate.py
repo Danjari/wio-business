@@ -199,7 +199,7 @@ def run(
                 "status": "pending_approval",
                 "has_receipt": True,
                 "zoho_synced": False,
-                "note": "Auto-created from Telegram bot receipt — no matching transaction found",
+                "note": "Auto-created from Slack bot receipt — no matching transaction found",
                 "card_id": "c5",  # founder's petty cash card — demo default
             })
             db.create_approval({
@@ -209,7 +209,7 @@ def run(
                 "merchant": merchant or "Unknown Merchant",
                 "category": result.category_used,
                 "card_id": "c5",
-                "note": f"Receipt submitted via Telegram bot. Category: {result.category_used}.",
+                "note": f"Receipt submitted via Slack bot. Category: {result.category_used}.",
                 "date": date or "",
                 "required_level": required_level,
             })
