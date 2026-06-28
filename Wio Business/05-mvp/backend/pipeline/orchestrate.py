@@ -61,22 +61,23 @@ def run(
     result.log("pipeline_start", f"receipt_id={receipt_id}")
 
     # ── Step 1: Textract ──────────────────────────────────────────────────────
+    textract_failed = False
+    textract_result: Optional[ExtractResult] = None
     try:
-        textract_result: ExtractResult = extract.extract_receipt(image_path)
+        textract_result = extract.extract_receipt(image_path)
         result.log("textract_done", f"confidence={textract_result.textract_confidence:.1f} high={textract_result.high_confidence}")
     except RuntimeError as exc:
-        result.error = str(exc)
         result.log("textract_error", str(exc))
-        _save(db, receipt_id, result)
-        return result
+        textract_failed = True
 
-    merchant = textract_result.merchant
-    total = textract_result.total
-    date = textract_result.date
-    extraction_method = "textract"
+    merchant = textract_result.merchant if textract_result else None
+    total = textract_result.total if textract_result else None
+    date = textract_result.date if textract_result else None
+    extraction_method = "textract" if not textract_failed else "gemini_vision"
 
     # ── Step 2: Gemini Flash text fallback ────────────────────────────────────
-    if not textract_result.high_confidence:
+    # Skip if Textract failed completely (no raw text to work with) — go direct to vision
+    if not textract_failed and not textract_result.high_confidence:
         result.log("llm_text_start", "textract confidence below threshold")
         try:
             text_result = llm_text.extract_from_text(textract_result.raw_text)
@@ -122,6 +123,35 @@ def run(
 
         except RuntimeError as exc:
             result.log("llm_text_error", str(exc))
+
+    # ── Textract unavailable — go direct to Gemini Vision ────────────────────
+    if textract_failed:
+        result.log("llm_vision_start", "textract unavailable — using Gemini Vision directly")
+        try:
+            vision_result = llm_vision.extract_from_image(image_path)
+            extraction_method = "gemini_vision"
+            result.log("llm_vision_done", f"confidence={vision_result.confidence:.2f}")
+            merchant = vision_result.merchant
+            total = vision_result.total
+            date = vision_result.date
+            if vision_result.confidence < VISION_CONFIDENCE_THRESHOLD:
+                result.status = "needs_clarity"
+                result.extraction_method = extraction_method
+                result.log("needs_clarity", "vision confidence below 0.99")
+                _save(db, receipt_id, result)
+                if bot_notify_fn:
+                    bot_notify_fn(
+                        "I couldn't read that receipt clearly enough. "
+                        "Could you take a clearer photo showing the total and date?"
+                    )
+                return result
+        except RuntimeError as exc:
+            result.error = str(exc)
+            result.log("llm_vision_error", str(exc))
+            _save(db, receipt_id, result)
+            if bot_notify_fn:
+                bot_notify_fn("Could not process that receipt. Please try again.")
+            return result
 
     result.merchant = merchant
     result.total = total
