@@ -14,7 +14,6 @@ import logging
 import os
 import tempfile
 from pathlib import Path
-from urllib.parse import parse_qs, unquote, urlparse
 
 import httpx
 
@@ -86,29 +85,30 @@ def handle_event(event: dict, say, db: SupabaseClient | None) -> None:
 
 
 def _download_file(url: str) -> str:
-    """Download a Slack file using the bot token. Returns temp file path."""
-    headers = {"Authorization": f"Bearer {_BOT_TOKEN}"}
-    resp = httpx.get(url, headers=headers, timeout=30.0, follow_redirects=False)
+    """Download a Slack file using the bot token. Returns temp file path.
 
-    if resp.status_code in (301, 302, 303, 307, 308):
-        location = resp.headers.get("location", "")
-        parsed = urlparse(location)
-        # Slack wraps the real file path in a ?redir= query param on the workspace subdomain.
-        # Extract and reconstruct the actual file URL instead of hitting the redirect page.
-        redir = parse_qs(parsed.query).get("redir", [""])[0]
-        actual_url = f"{parsed.scheme}://{parsed.netloc}{unquote(redir)}" if redir else location
-        resp = httpx.get(actual_url, headers=headers, timeout=30.0, follow_redirects=True)
+    Slack's redirect chain crosses domains (files.slack.com → workspace subdomain).
+    httpx strips Authorization on cross-domain redirects by default. Using a request
+    event hook ensures the Bearer token is injected on every request in the chain,
+    including all redirected ones, regardless of destination domain.
+    """
+    def _inject_auth(request: httpx.Request) -> None:
+        request.headers["Authorization"] = f"Bearer {_BOT_TOKEN}"
+
+    with httpx.Client(
+        event_hooks={"request": [_inject_auth]},
+        follow_redirects=True,
+        timeout=30.0,
+    ) as client:
+        resp = client.get(url)
 
     resp.raise_for_status()
 
     content_type = resp.headers.get("content-type", "")
-    if "png" in content_type:
-        suffix = ".png"
-    elif "pdf" in content_type:
-        suffix = ".pdf"
-    else:
-        suffix = ".jpg"
+    if "text/html" in content_type:
+        raise RuntimeError("Slack returned HTML instead of image — check SLACK_BOT_TOKEN and files:read scope")
 
+    suffix = ".png" if "png" in content_type else ".pdf" if "pdf" in content_type else ".jpg"
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
     tmp.write(resp.content)
     tmp.close()
