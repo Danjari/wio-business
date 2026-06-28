@@ -35,6 +35,14 @@ logger = logging.getLogger(__name__)
 
 app = App(token=os.getenv("SLACK_BOT_TOKEN", ""))
 
+
+@app.middleware
+def log_all_payloads(body, next):
+    logger.info(f"RAW PAYLOAD type={body.get('type')} "
+                f"event={body.get('event', {}).get('type')} "
+                f"subtype={body.get('event', {}).get('subtype')}")
+    return next()
+
 _db: SupabaseClient | None = None
 try:
     _db = SupabaseClient()
@@ -45,6 +53,7 @@ except RuntimeError as exc:
 
 @app.event("message")
 def handle_message(event, say, client):
+    logger.info(f"Bolt dispatched message event — channel_type={event.get('channel_type')}")
     handler.handle_event(event, say=say, client=client, db=_db)
 
 
@@ -52,5 +61,15 @@ if __name__ == "__main__":
     app_token = os.getenv("SLACK_APP_TOKEN", "")
     if not app_token:
         raise RuntimeError("SLACK_APP_TOKEN must be set in .env")
+
+    # Verify which bot identity is loaded
+    try:
+        from slack_sdk import WebClient as _WC
+        auth = _WC(token=os.getenv("SLACK_BOT_TOKEN", "")).auth_test()
+        logger.info(f"Connected as bot='{auth['bot_id']}' user='{auth['user']}' "
+                    f"workspace='{auth['team']}' url={auth['url']}")
+    except Exception as exc:
+        logger.warning(f"auth.test failed: {exc}")
+
     logger.info("Starting Slack Socket Mode — no public URL needed")
     SocketModeHandler(app, app_token).start()

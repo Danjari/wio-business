@@ -24,6 +24,9 @@ from pipeline.extract import ExtractResult
 
 VISION_CONFIDENCE_THRESHOLD = 0.99
 LLM_TEXT_CONFIDENCE_THRESHOLD = 0.99
+# Textract must meet this per-field total confidence to skip the text LLM fallback.
+# Below this threshold, or when total is entirely absent, text fallback runs.
+TOTAL_CONFIDENCE_THRESHOLD = 80.0
 
 
 @dataclass
@@ -31,6 +34,7 @@ class PipelineResult:
     status: str  # 'matched' | 'unmatched_routed' | 'needs_clarity' | 'error'
     merchant: Optional[str] = None
     total: Optional[float] = None
+    currency: Optional[str] = None
     date: Optional[str] = None
     category_rules: Optional[str] = None
     category_llm: Optional[str] = None
@@ -76,9 +80,23 @@ def run(
     extraction_method = "textract" if not textract_failed else "gemini_vision"
 
     # ── Step 2: Gemini Flash text fallback ────────────────────────────────────
-    # Skip if Textract failed completely (no raw text to work with) — go direct to vision
-    if not textract_failed and not textract_result.high_confidence:
-        result.log("llm_text_start", "textract confidence below threshold")
+    # Trigger when: Textract has no total OR total confidence is below threshold.
+    # Merchant/date issues alone do NOT trigger this — only missing/low-confidence total.
+    # Skip entirely if Textract failed (no raw_text) — fall through to vision below.
+    needs_text_fallback = (
+        not textract_failed
+        and textract_result is not None
+        and (
+            textract_result.total is None
+            or textract_result.total_confidence < TOTAL_CONFIDENCE_THRESHOLD
+        )
+    )
+    if needs_text_fallback:
+        result.log(
+            "llm_text_start",
+            f"total={'missing' if textract_result.total is None else 'low-conf'} "
+            f"total_conf={textract_result.total_confidence:.1f}",
+        )
         try:
             text_result = llm_text.extract_from_text(textract_result.raw_text)
             extraction_method = "textract+gemini_text"
@@ -92,8 +110,10 @@ def run(
                 date = text_result.date
 
             # ── Step 3: Gemini Flash vision — last resort ─────────────────────
-            if text_result.confidence < LLM_TEXT_CONFIDENCE_THRESHOLD:
-                result.log("llm_vision_start", "text LLM confidence below threshold — REGULATORY NOTE: image leaves UAE region")
+            # Only escalate to vision when the total is STILL missing after text fallback.
+            # Don't burn a vision call just because merchant or date are uncertain.
+            if total is None:
+                result.log("llm_vision_start", "total still missing after text fallback — REGULATORY NOTE: image leaves UAE region")
                 try:
                     vision_result = llm_vision.extract_from_image(image_path)
                     extraction_method = "textract+gemini_text+gemini_vision"
@@ -155,6 +175,7 @@ def run(
 
     result.merchant = merchant
     result.total = total
+    result.currency = (textract_result.currency if textract_result else None) or "AED"
     result.date = date
     result.extraction_method = extraction_method
 
@@ -211,7 +232,7 @@ def run(
         if bot_notify_fn:
             bot_notify_fn(
                 f"✓ Receipt matched — {match_result.merchant} · "
-                f"AED {match_result.amount:,.0f} · "
+                f"{result.currency} {match_result.amount:,.2f} · "
                 f"Category: {result.category_used} · Zoho Books updated."
             )
 
@@ -247,7 +268,7 @@ def run(
 
         if bot_notify_fn:
             bot_notify_fn(
-                f"Receipt saved — {merchant or 'Unknown'} · AED {total:,.0f} · "
+                f"Receipt saved — {merchant or 'Unknown'} · {result.currency} {total:,.2f} · "
                 f"No matching card transaction found, so I've sent it to your approvals queue "
                 f"({_approval_level(total)} review required)."
             )
@@ -262,6 +283,7 @@ def _save(db, receipt_id: str, result: PipelineResult) -> None:
         "status": result.status,
         "merchant": result.merchant,
         "amount": result.total,
+        "currency": result.currency,
         "date": result.date,
         "category_rules": result.category_rules,
         "category_llm": result.category_llm,

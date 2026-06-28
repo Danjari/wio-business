@@ -17,7 +17,7 @@ from typing import Optional
 from google import genai
 from google.genai import types
 
-_MODEL_ID = os.getenv("GEMINI_TEXT_MODEL", "gemini-2.0-flash")
+_MODEL_ID = os.getenv("GEMINI_TEXT_MODEL", "gemini-3.5-flash")
 
 _SYSTEM = """You are an expense receipt data extractor.
 Given raw OCR text from a receipt, extract the merchant name, total amount paid, and date.

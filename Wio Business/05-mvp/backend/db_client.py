@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 import time
+import uuid
 from typing import Any
 
 from supabase import create_client, Client
@@ -55,6 +56,8 @@ class SupabaseClient:
         self._db.table("transactions").update(fields).eq("id", tx_id).execute()
 
     def create_transaction(self, data: dict) -> str:
+        if "id" not in data:
+            data = {"id": f"tx_{uuid.uuid4().hex[:12]}", **data}
         resp = self._db.table("transactions").insert(data).execute()
         return str(resp.data[0]["id"])
 

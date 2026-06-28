@@ -32,7 +32,7 @@ CATEGORIES = [
     "Fuel",
 ]
 
-_MODEL_ID = os.getenv("GEMINI_CATEGORIZE_MODEL", "gemini-2.0-flash")
+_MODEL_ID = os.getenv("GEMINI_CATEGORIZE_MODEL", "gemini-3.5-flash")
 
 _SYSTEM = (
     "You are an expense categorization engine for a UAE SME. "

@@ -24,7 +24,7 @@ from google import genai
 from google.genai import types
 from PIL import Image
 
-_MODEL_ID = os.getenv("GEMINI_VISION_MODEL", "gemini-2.0-flash")
+_MODEL_ID = os.getenv("GEMINI_VISION_MODEL", "gemini-3.5-flash")
 
 _SYSTEM = """You are an expense receipt data extractor.
 Extract the merchant name, total amount paid, and date from this receipt image.

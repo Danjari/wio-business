@@ -6,11 +6,10 @@ downloads the file, and dispatches to the processing pipeline.
 
 Bot identity: all receipts are attributed to Sara (founder, t1) for the demo.
 
-File download note: Slack's private file URLs (url_private_download) redirect through
-a workspace subdomain that only accepts cookie-based auth, not Bearer tokens — a known
-unresolved issue in the Slack SDK (github.com/slackapi/bolt-js/issues/2585).
-Workaround: temporarily make the file public via files_sharedPublicURL, download it,
-then immediately revoke public access. Requires the files:write scope.
+File download note: url_private_download with a user token (xoxe.xoxp-) works via
+direct Bearer auth even though bot tokens fail on the same URL (redirect chain rejects
+bot tokens but accepts user tokens). files.sharedPublicURL is not used — it requires
+public file sharing to be enabled at the workspace admin level.
 """
 
 from __future__ import annotations
@@ -21,7 +20,6 @@ import tempfile
 from pathlib import Path
 
 import httpx
-from slack_sdk import WebClient as SlackWebClient
 
 from db_client import SupabaseClient
 
@@ -36,11 +34,17 @@ def handle_event(event: dict, say, client, db: SupabaseClient | None) -> None:
     Process a single Slack message event.
     Called by the Slack Bolt app for each incoming message event.
     """
+    logger.info(f"Event received — type={event.get('type')} subtype={event.get('subtype')} "
+                f"bot_id={event.get('bot_id')} user={event.get('user')} "
+                f"files={len(event.get('files', []))} text={repr((event.get('text') or '')[:60])}")
+
     if event.get("bot_id") or event.get("subtype") == "bot_message":
+        logger.info("Skipping bot message")
         return
 
     files = event.get("files", [])
     image_files = [f for f in files if f.get("mimetype", "").startswith("image/")]
+    logger.info(f"Files: {len(files)} total, {len(image_files)} images")
 
     if not image_files:
         _handle_text((event.get("text") or "").strip(), say)
@@ -90,44 +94,45 @@ def handle_event(event: dict, say, client, db: SupabaseClient | None) -> None:
 
 def _download_file(file_id: str, slack_client) -> str:
     """
-    Download a Slack file via temporary public URL.
+    Download a Slack file using direct Bearer-token auth.
 
-    Bearer token auth on url_private_download is broken — Slack's redirect chain
-    ends at a workspace subdomain that only accepts cookie auth (known unresolved
-    Slack issue). files_sharedPublicURL also rejects bot tokens ('not_allowed_token_type').
-    Workaround: use a user token (xoxp-) for files_sharedPublicURL, download,
-    then revoke immediately. Requires SLACK_USER_TOKEN with user-level files:read scope.
+    files.sharedPublicURL is blocked (workspace has public sharing disabled).
+    url_private_download with a bot token redirects through a workspace subdomain
+    that only accepts cookie auth — but a user token (xoxp-/xoxe.xoxp-) is accepted
+    by that redirect chain because the user owns the file. Try user token first,
+    fall back to bot token in case the workspace configuration differs.
     """
-    if not _USER_TOKEN:
-        raise RuntimeError(
-            "SLACK_USER_TOKEN not set — add user-level files:read scope in app settings, "
-            "reinstall, and copy the User OAuth Token (xoxp-...) to .env"
-        )
-    user_client = SlackWebClient(token=_USER_TOKEN)
-    try:
-        result = user_client.files_sharedPublicURL(file=file_id)
-        public_url = result["file"]["permalink_public"]
+    info = slack_client.files_info(file=file_id)
+    url = info["file"].get("url_private_download") or info["file"].get("url_private")
+    if not url:
+        raise RuntimeError("No download URL returned by files.info")
 
-        resp = httpx.get(public_url, follow_redirects=True, timeout=30.0)
-        resp.raise_for_status()
+    tokens_to_try = [t for t in [_USER_TOKEN, slack_client.token] if t]
+    last_error: Exception | None = None
 
-        content_type = resp.headers.get("content-type", "")
-        if "text/html" in content_type:
-            raise RuntimeError(
-                "Got HTML from public file URL — public file sharing may be disabled in this workspace"
-            )
-
-        suffix = ".png" if "png" in content_type else ".pdf" if "pdf" in content_type else ".jpg"
-        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-        tmp.write(resp.content)
-        tmp.close()
-        return tmp.name
-
-    finally:
+    for token in tokens_to_try:
         try:
-            user_client.files_revokePublicURL(file=file_id)
+            resp = httpx.get(
+                url,
+                headers={"Authorization": f"Bearer {token}"},
+                follow_redirects=True,
+                timeout=30.0,
+            )
+            resp.raise_for_status()
+            content_type = resp.headers.get("content-type", "")
+            if "text/html" in content_type:
+                last_error = RuntimeError(f"Got HTML with token ending ...{token[-6:]}")
+                continue
+            suffix = ".png" if "png" in content_type else ".pdf" if "pdf" in content_type else ".jpg"
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+            tmp.write(resp.content)
+            tmp.close()
+            return tmp.name
         except Exception as exc:
-            logger.warning(f"Could not revoke public URL for file {file_id}: {exc}")
+            last_error = exc
+            logger.warning(f"Download attempt with token ending ...{token[-6:]} failed: {exc}")
+
+    raise RuntimeError(f"All download attempts failed. Last error: {last_error}")
 
 
 def _handle_text(text: str, say) -> None:
