@@ -44,8 +44,8 @@ except RuntimeError as exc:
 
 
 @app.event("message")
-def handle_message(event, say):
-    handler.handle_event(event, say=say, db=_db)
+def handle_message(event, say, client):
+    handler.handle_event(event, say=say, client=client, db=_db)
 
 
 if __name__ == "__main__":
