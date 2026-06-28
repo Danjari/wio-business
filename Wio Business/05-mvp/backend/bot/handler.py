@@ -21,12 +21,14 @@ import tempfile
 from pathlib import Path
 
 import httpx
+from slack_sdk import WebClient as SlackWebClient
 
 from db_client import SupabaseClient
 
 logger = logging.getLogger(__name__)
 
 _DEMO_TEAM_MEMBER_ID = "t1"
+_USER_TOKEN = os.getenv("SLACK_USER_TOKEN", "")
 
 
 def handle_event(event: dict, say, client, db: SupabaseClient | None) -> None:
@@ -90,13 +92,20 @@ def _download_file(file_id: str, slack_client) -> str:
     """
     Download a Slack file via temporary public URL.
 
-    Bearer token auth on url_private_download is broken due to Slack's cross-domain
-    redirect chain ending at a cookie-only endpoint. Workaround: make the file
-    temporarily public, download it, then revoke immediately.
-    Requires files:write scope on the bot token.
+    Bearer token auth on url_private_download is broken — Slack's redirect chain
+    ends at a workspace subdomain that only accepts cookie auth (known unresolved
+    Slack issue). files_sharedPublicURL also rejects bot tokens ('not_allowed_token_type').
+    Workaround: use a user token (xoxp-) for files_sharedPublicURL, download,
+    then revoke immediately. Requires SLACK_USER_TOKEN with user-level files:read scope.
     """
+    if not _USER_TOKEN:
+        raise RuntimeError(
+            "SLACK_USER_TOKEN not set — add user-level files:read scope in app settings, "
+            "reinstall, and copy the User OAuth Token (xoxp-...) to .env"
+        )
+    user_client = SlackWebClient(token=_USER_TOKEN)
     try:
-        result = slack_client.files_sharedPublicURL(file=file_id)
+        result = user_client.files_sharedPublicURL(file=file_id)
         public_url = result["file"]["permalink_public"]
 
         resp = httpx.get(public_url, follow_redirects=True, timeout=30.0)
@@ -116,7 +125,7 @@ def _download_file(file_id: str, slack_client) -> str:
 
     finally:
         try:
-            slack_client.files_revokePublicURL(file=file_id)
+            user_client.files_revokePublicURL(file=file_id)
         except Exception as exc:
             logger.warning(f"Could not revoke public URL for file {file_id}: {exc}")
 
