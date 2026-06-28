@@ -14,6 +14,7 @@ import logging
 import os
 import tempfile
 from pathlib import Path
+from urllib.parse import parse_qs, unquote, urlparse
 
 import httpx
 
@@ -87,12 +88,17 @@ def handle_event(event: dict, say, db: SupabaseClient | None) -> None:
 def _download_file(url: str) -> str:
     """Download a Slack file using the bot token. Returns temp file path."""
     headers = {"Authorization": f"Bearer {_BOT_TOKEN}"}
-    # Slack redirects to a workspace-specific domain — re-add auth header manually
-    # because httpx strips it on cross-domain redirects (security default).
     resp = httpx.get(url, headers=headers, timeout=30.0, follow_redirects=False)
+
     if resp.status_code in (301, 302, 303, 307, 308):
         location = resp.headers.get("location", "")
-        resp = httpx.get(location, headers=headers, timeout=30.0, follow_redirects=True)
+        parsed = urlparse(location)
+        # Slack wraps the real file path in a ?redir= query param on the workspace subdomain.
+        # Extract and reconstruct the actual file URL instead of hitting the redirect page.
+        redir = parse_qs(parsed.query).get("redir", [""])[0]
+        actual_url = f"{parsed.scheme}://{parsed.netloc}{unquote(redir)}" if redir else location
+        resp = httpx.get(actual_url, headers=headers, timeout=30.0, follow_redirects=True)
+
     resp.raise_for_status()
 
     content_type = resp.headers.get("content-type", "")
