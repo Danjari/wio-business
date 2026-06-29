@@ -1,12 +1,18 @@
-app = "wio-receipt-bot"
-primary_region = "dxb"
+# fly.toml app configuration file generated for wio-receipt-bot on 2026-06-29T04:04:40+04:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'wio-receipt-bot'
+primary_region = 'fra'
 
 [build]
 
 [env]
-AWS_REGION = "me-south-1"
+  AWS_REGION = 'me-south-1'
 
 [[vm]]
-  memory = "256mb"
-  cpu_kind = "shared"
+  memory = '256mb'
+  cpu_kind = 'shared'
   cpus = 1
+  memory_mb = 256
