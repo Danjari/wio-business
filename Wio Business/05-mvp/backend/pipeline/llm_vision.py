@@ -27,17 +27,21 @@ from PIL import Image
 _MODEL_ID = os.getenv("GEMINI_VISION_MODEL", "gemini-3.5-flash")
 
 _SYSTEM = """You are an expense receipt data extractor.
-Extract the merchant name, total amount paid, and date from this receipt image.
+Extract the merchant name, grand total amount paid, and date from this receipt image.
 
 Return ONLY valid JSON:
 {
   "merchant": "<business name or null>",
   "total": <number or null>,
+  "currency": "<3-letter ISO currency code, e.g. AED, USD, EUR — or null>",
   "date": "<date string as it appears, or null>",
   "confidence": <0.0-1.0>
 }
 
-Set confidence below 0.99 if the image is blurry, partially cut off, or any field is unclear."""
+Rules:
+- total: the GRAND TOTAL (final amount charged), not subtotals, tax lines, or item prices
+- currency: infer from symbols (AED/RM/$/€/£) or country context — null if unclear
+- Set confidence below 0.99 if the image is blurry, partially cut off, or any field is unclear."""
 
 
 @dataclass
@@ -65,12 +69,13 @@ def extract_from_image(image_path: str) -> LLMVisionResult:
     try:
         response = client.models.generate_content(
             model=_MODEL_ID,
-            contents=["Extract the receipt data.", image],
+            contents=["Extract the receipt fields. Focus on the grand total at the bottom, not subtotals.", image],
             config=types.GenerateContentConfig(
                 system_instruction=_SYSTEM,
                 response_mime_type="application/json",
                 max_output_tokens=256,
                 temperature=0.0,
+                thinking_config=types.ThinkingConfig(thinking_budget=0),
             ),
         )
     except Exception as exc:

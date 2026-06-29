@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import { Shield, User, Check, X, CheckCircle2 } from 'lucide-react'
-import { TEAM, APPROVAL_RULES, fmtAED, fmtDate, type ProcessedApproval } from '../data'
+import { TEAM, APPROVAL_RULES, fmtAmount, fmtDate, type ProcessedApproval } from '../data'
 import type { AppState } from '../App'
 import Avatar from '../components/Avatar'
 
@@ -123,7 +123,7 @@ export default function Approvals({ approvals, setApprovals, processed, setProce
                         <span style={{ fontSize: 11, color: C.textLight }}>· {fmtDate(item.date)}</span>
                       </div>
                       <div style={{ fontSize: 20, fontWeight: 500, color: C.textDark, marginBottom: 2 }}>{item.merchant}</div>
-                      <div style={{ fontSize: 26, fontWeight: 500, color: C.textDark, marginBottom: 10 }}>{fmtAED(item.amount)}</div>
+                      <div style={{ fontSize: 26, fontWeight: 500, color: C.textDark, marginBottom: 10 }}>{fmtAmount(item.amount, transactions.find(t => t.id === item.txId)?.currency)}</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <Avatar seed={requester?.name ?? ''} size={22} />
                         <span style={{ fontSize: 12, color: C.textMid }}>{requester?.name} · {requester?.role}</span>
@@ -214,7 +214,7 @@ export default function Approvals({ approvals, setApprovals, processed, setProce
                       <div style={{ fontSize: 13, fontWeight: 500, color: C.textDark }}>{item.merchant}</div>
                       <div style={{ fontSize: 11, color: C.textLight, marginTop: 2 }}>{requester?.name}</div>
                     </div>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: C.textDark, textAlign: 'right' }}>{fmtAED(item.amount)}</div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: C.textDark, textAlign: 'right' }}>{fmtAmount(item.amount, transactions.find(t => t.id === item.txId)?.currency)}</div>
                     <div style={{ fontSize: 12, color: C.textLight, textAlign: 'right' }}>{fmtDate(item.date)}</div>
                     <div style={{ textAlign: 'right' }}>
                       <span style={{ fontSize: 11, fontWeight: 500, padding: '3px 10px', borderRadius: 99, background: approved ? '#DCFCE7' : '#FEE2E2', color: approved ? '#16A34A' : '#DC2626' }}>

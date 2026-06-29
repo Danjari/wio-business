@@ -151,6 +151,20 @@ export const CHART_OF_ACCOUNTS: Record<string, string> = {
   'Other':                   '9000 — Other Expenses',
 }
 
+// Mirrors backend fallback rates — used for client-side display aggregations only.
+// USD is the fixed AED peg. Others are approximate but good enough for UI summing.
+const _TO_AED_RATES: Record<string, number> = {
+  USD: 3.6725, EUR: 4.02, GBP: 4.65, SAR: 0.9793,
+  KWD: 11.97,  BHD: 9.74, QAR: 1.008, OMR: 9.54,
+  MYR: 0.83,   INR: 0.044, SGD: 2.72, CAD: 2.70, AUD: 2.37,
+}
+
+export function toAED(amount: number, currency = 'AED'): number {
+  if (!currency || currency.toUpperCase() === 'AED') return amount
+  const rate = _TO_AED_RATES[currency.toUpperCase()]
+  return rate ? amount * rate : amount
+}
+
 export function fmtAED(amount: number): string {
   return 'AED ' + new Intl.NumberFormat('en-AE', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount)
 }

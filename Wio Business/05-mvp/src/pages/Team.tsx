@@ -1,5 +1,5 @@
 import React from 'react'
-import { TEAM, fmtAED } from '../data'
+import { TEAM, fmtAED, toAED } from '../data'
 import type { AppState } from '../App'
 import Avatar from '../components/Avatar'
 
@@ -18,7 +18,7 @@ export default function Team({ cards, transactions }: AppState) {
     const cardIds = memberCards.map(c => c.id)
     const totalSpend = transactions
       .filter(t => cardIds.includes(t.cardId) && t.status === 'approved')
-      .reduce((sum, t) => sum + t.amount, 0)
+      .reduce((sum, t) => sum + toAED(t.amount, t.currency), 0)
     const primaryCard = memberCards[0]
     const pct = primaryCard ? Math.min((primaryCard.spent / primaryCard.limit) * 100, 100) : 0
     return { member, memberCards, totalSpend, primaryCard, pct }

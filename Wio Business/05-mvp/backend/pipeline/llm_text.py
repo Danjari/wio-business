@@ -56,7 +56,8 @@ def extract_from_text(raw_text: str) -> LLMTextResult:
         return LLMTextResult(confidence=0.0)
 
     client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-    truncated = raw_text[:3000]
+    # Keep the tail of the text — receipt totals appear at the bottom, not the top.
+    truncated = raw_text[-3000:] if len(raw_text) > 3000 else raw_text
 
     try:
         response = client.models.generate_content(
@@ -67,6 +68,7 @@ def extract_from_text(raw_text: str) -> LLMTextResult:
                 response_mime_type="application/json",
                 max_output_tokens=256,
                 temperature=0.0,
+                thinking_config=types.ThinkingConfig(thinking_budget=0),
             ),
         )
     except Exception as exc:
