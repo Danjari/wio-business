@@ -248,19 +248,33 @@ const inputStyle: React.CSSProperties = {
 export default function Cards({ cards, setCards, transactions, navigate, showToast }: AppState) {
   const [showModal, setShowModal] = useState(false)
 
-  const handleIssue = (card: Card) => {
-    setCards(prev => [...prev, card])
+  const handleIssue = async (card: Card) => {
     setShowModal(false)
-    showToast('Card issued successfully')
+    try {
+      const { createCard } = await import('../lib/db')
+      const saved = await createCard(card)
+      setCards(prev => [...prev, saved])
+      showToast('Card issued successfully')
+    } catch (err) {
+      console.error('Card creation failed:', err)
+      showToast('Failed to issue card — please try again', 'error')
+    }
   }
 
-  const toggleFreeze = (cardId: string) => {
-    setCards(prev => prev.map(c => {
-      if (c.id !== cardId) return c
-      const next = c.status === 'active' ? 'frozen' : 'active'
+  const toggleFreeze = async (cardId: string) => {
+    const card = cards.find(c => c.id === cardId)
+    if (!card) return
+    const next = card.status === 'active' ? 'frozen' : 'active'
+    setCards(prev => prev.map(c => c.id === cardId ? { ...c, status: next } : c))
+    try {
+      const { updateCardStatus } = await import('../lib/db')
+      await updateCardStatus(cardId, next)
       showToast(next === 'frozen' ? 'Card frozen' : 'Card unfrozen')
-      return { ...c, status: next }
-    }))
+    } catch (err) {
+      console.error('Freeze toggle failed:', err)
+      showToast('Failed to update card — please refresh', 'error')
+      setCards(prev => prev.map(c => c.id === cardId ? { ...c, status: card.status } : c))
+    }
   }
 
   return (

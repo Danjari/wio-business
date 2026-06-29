@@ -14,13 +14,6 @@ const C = {
   red: '#EF4444',
 }
 
-const CATEGORY_SPEND = [
-  { cat: 'Travel', amount: 4125, pct: 50 },
-  { cat: 'Client Meals', amount: 1840, pct: 22 },
-  { cat: 'Office Supplies', amount: 1425, pct: 17 },
-  { cat: 'SaaS Tools', amount: 800, pct: 10 },
-  { cat: 'Advertising', amount: 770, pct: 9 },
-]
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; bg: string; color: string }> = {
@@ -51,9 +44,17 @@ export default function Dashboard({ cards, transactions, approvals, navigate }: 
   const now = new Date()
   const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
   const monthLabel = now.toLocaleDateString('en-AE', { month: 'long', year: 'numeric' })
-  const monthSpend = transactions
-    .filter(t => t.date >= monthStart && t.status === 'approved')
-    .reduce((s, t) => s + toAED(t.amount, t.currency), 0)
+
+  const monthTxs = transactions.filter(t => t.date >= monthStart && t.status === 'approved')
+  const monthSpend = monthTxs.reduce((s, t) => s + toAED(t.amount, t.currency), 0)
+
+  const catMap: Record<string, number> = {}
+  monthTxs.forEach(t => { catMap[t.category] = (catMap[t.category] ?? 0) + toAED(t.amount, t.currency) })
+  const catTotal = Object.values(catMap).reduce((s, v) => s + v, 0) || 1
+  const categorySpend = Object.entries(catMap)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([cat, amount]) => ({ cat, amount, pct: Math.round((amount / catTotal) * 100) }))
 
   const kpis = [
     { label: "This month's spend", value: fmtAED(monthSpend), sub: monthLabel, flagColor: undefined as string | undefined, onClick: undefined as (() => void) | undefined },
@@ -90,8 +91,10 @@ export default function Dashboard({ cards, transactions, approvals, navigate }: 
         {/* Spend by category */}
         <div>
           <div style={{ fontSize: 11, fontWeight: 500, color: C.textLight, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 22 }}>Spend by category</div>
-          {CATEGORY_SPEND.map((c, i) => (
-            <div key={c.cat} style={{ paddingBottom: 18, marginBottom: i < CATEGORY_SPEND.length - 1 ? 18 : 0, borderBottom: i < CATEGORY_SPEND.length - 1 ? `1px solid ${C.border}` : 'none' }}>
+          {categorySpend.length === 0 ? (
+            <div style={{ fontSize: 13, color: C.textLight, padding: '24px 0' }}>No approved spend this month yet</div>
+          ) : categorySpend.map((c, i) => (
+            <div key={c.cat} style={{ paddingBottom: 18, marginBottom: i < categorySpend.length - 1 ? 18 : 0, borderBottom: i < categorySpend.length - 1 ? `1px solid ${C.border}` : 'none' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 7 }}>
                 <span style={{ fontSize: 13, color: C.textMid }}>{c.cat}</span>
                 <span style={{ fontSize: 13, fontWeight: 500, color: C.textDark }}>{fmtAED(c.amount)}</span>

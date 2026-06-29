@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useCallback } from 'react'
 import { TrendingUp, CheckCircle2, Shield, User, AlertCircle } from 'lucide-react'
 import { TEAM, fmtAED, toAED } from '../data'
 import type { AppState } from '../App'
@@ -33,15 +33,6 @@ function periodCutoff(period: Period): string {
   return '2000-01-01'
 }
 
-const MONTHLY_TREND = [
-  { month: 'Jan', amount: 6800 },
-  { month: 'Feb', amount: 7200 },
-  { month: 'Mar', amount: 5900 },
-  { month: 'Apr', amount: 8100 },
-  { month: 'May', amount: 9400 },
-  { month: 'Jun', amount: 8205 },
-]
-
 export default function Reporting({ transactions, cards }: AppState) {
   const [period, setPeriod] = useState<Period>('month')
 
@@ -73,7 +64,23 @@ export default function Reporting({ transactions, cards }: AppState) {
   const founderApproval = periodTxs.filter(t => t.amount > 5000).length
   const totalForPolicy = periodTxs.length || 1
 
-  const trendMax = Math.max(...MONTHLY_TREND.map(m => m.amount))
+  const monthlyTrend = useMemo(() => {
+    const months = []
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date()
+      d.setDate(1)
+      d.setMonth(d.getMonth() - i)
+      const yearMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      const label = d.toLocaleDateString('en-AE', { month: 'short' })
+      const amount = transactions
+        .filter(t => t.date.startsWith(yearMonth) && t.status === 'approved')
+        .reduce((s, t) => s + toAED(t.amount, t.currency), 0)
+      months.push({ month: label, amount, isCurrent: i === 0 })
+    }
+    return months
+  }, [transactions])
+
+  const trendMax = Math.max(...monthlyTrend.map(m => m.amount), 1)
 
   const kpis = [
     { label: 'Total spend', value: fmtAED(totalSpend), sub: `${approved.length} transactions`, accent: C.purple as string | undefined },
@@ -170,9 +177,8 @@ export default function Reporting({ transactions, cards }: AppState) {
           <div style={{ fontSize: 11, fontWeight: 500, color: C.textLight, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Month-over-month spend</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, height: 140 }}>
-          {MONTHLY_TREND.map(({ month, amount }) => {
+          {monthlyTrend.map(({ month, amount, isCurrent }) => {
             const barH = Math.round((amount / trendMax) * 110)
-            const isCurrent = month === 'Jun'
             return (
               <div key={month} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
                 <div style={{ fontSize: 11, fontWeight: 500, color: isCurrent ? C.purple : C.textLight }}>

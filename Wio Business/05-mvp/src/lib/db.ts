@@ -100,18 +100,42 @@ export async function resolveApproval(
     supabase
       .from('approvals')
       .update({ outcome, processed_at: now })
-      .eq('id', approvalId),
+      .eq('id', approvalId)
+      .select('id'),
     supabase
       .from('transactions')
       .update({ status: outcome })
-      .eq('id', txId),
+      .eq('id', txId)
+      .select('id'),
   ])
 
   if (approvalRes.error) throw approvalRes.error
   if (txRes.error) throw txRes.error
+  // 0 rows → RLS silently blocked the write
+  if (!approvalRes.data?.length) throw new Error('Approval write blocked — disable RLS on approvals table in Supabase')
+  if (!txRes.data?.length) throw new Error('Transaction write blocked — disable RLS on transactions table in Supabase')
+}
+
+export async function createCard(card: Omit<Card, 'id' | 'spent'>): Promise<Card> {
+  const { data, error } = await supabase
+    .from('cards')
+    .insert({
+      holder_id:  card.holderId,
+      label:      card.label,
+      last4:      card.last4,
+      limit_aed:  card.limit,
+      spent:      0,
+      categories: card.categories,
+      status:     'active',
+    })
+    .select()
+    .single()
+  if (error) throw error
+  return mapCard(data as Record<string, unknown>)
 }
 
 export async function updateCardStatus(cardId: string, status: 'active' | 'frozen'): Promise<void> {
-  const { error } = await supabase.from('cards').update({ status }).eq('id', cardId)
+  const { data, error } = await supabase.from('cards').update({ status }).eq('id', cardId).select('id')
   if (error) throw error
+  if (!data?.length) throw new Error('Card update blocked — disable RLS on cards table in Supabase')
 }

@@ -145,6 +145,7 @@ def main() -> None:
     start = time.time()
 
     for i, entry in enumerate(entries, 1):
+        from_cache = True
         try:
             extracted, from_cache = load_or_call_textract(entry, cache_dir, use_cache)
             predictions.append(extracted)
