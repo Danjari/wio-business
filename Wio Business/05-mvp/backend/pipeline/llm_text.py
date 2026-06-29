@@ -20,12 +20,13 @@ from google.genai import types
 _MODEL_ID = os.getenv("GEMINI_TEXT_MODEL", "gemini-3.5-flash")
 
 _SYSTEM = """You are an expense receipt data extractor.
-Given raw OCR text from a receipt, extract the merchant name, total amount paid, and date.
+Given raw OCR text from a receipt, extract the merchant name, total amount paid, currency, and date.
 
 Return ONLY valid JSON:
 {
   "merchant": "<business name or null>",
   "total": <number or null>,
+  "currency": "<3-letter ISO currency code, e.g. AED, USD, MYR, EUR — or null>",
   "date": "<date string as it appears on the receipt, or null>",
   "confidence": <0.0-1.0>
 }
@@ -33,6 +34,7 @@ Return ONLY valid JSON:
 Rules:
 - merchant: the business/vendor name, not a customer name
 - total: the final total amount (numeric, no currency symbols)
+- currency: infer from symbols (RM/MYR, AED/Dhs, $/USD, €/EUR, £/GBP) or country context — null if unclear
 - date: the transaction/receipt date (not expiry dates)
 - confidence: set below 0.99 if any field is ambiguous, missing, or the text is garbled
 - Use null for any field you cannot confidently determine"""
@@ -42,6 +44,7 @@ Rules:
 class LLMTextResult:
     merchant: Optional[str] = None
     total: Optional[float] = None
+    currency: Optional[str] = None
     date: Optional[str] = None
     confidence: float = 0.0
     raw_response: str = ""
@@ -85,6 +88,7 @@ def _parse(raw: str) -> LLMTextResult:
     try:
         data = json.loads(raw)
         result.merchant = data.get("merchant") or None
+        result.currency = data.get("currency") or None
         result.date = data.get("date") or None
         result.confidence = float(data.get("confidence") or 0.0)
         total = data.get("total")

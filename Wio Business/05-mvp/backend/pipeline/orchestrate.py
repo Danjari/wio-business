@@ -172,6 +172,8 @@ def run(
                 total = text_result.total
             if not date and text_result.date:
                 date = text_result.date
+            if not currency and text_result.currency:
+                currency = text_result.currency
 
             # ── Step 3: Gemini Flash vision — last resort ─────────────────────
             if total is None:
@@ -306,10 +308,11 @@ def run(
                     match_result.transaction_id,
                     {"has_receipt": True, "zoho_synced": True},
                 )
-                _save(db, receipt_id, result)
             except Exception as exc:
                 logger.error("DB write failed after match: %s", exc)
                 result.log("db_write_error", str(exc))
+            # Always persist the final receipt status — even if update_transaction failed above.
+            _save(db, receipt_id, result)
 
         _notify(
             bot_notify_fn,
@@ -335,7 +338,7 @@ def run(
                     "has_receipt": True,
                     "zoho_synced": False,
                     "note": "Auto-created from Slack bot receipt — no matching transaction found",
-                    "card_id": "c5",  # founder's petty cash card — demo default
+                    # card_id intentionally omitted — receipt came via Slack, not a card swipe
                 })
                 db.create_approval({
                     "tx_id": new_tx_id,
@@ -343,15 +346,16 @@ def run(
                     "amount": total,
                     "merchant": merchant or "Unknown Merchant",
                     "category": result.category_used,
-                    "card_id": "c5",
                     "note": f"Receipt submitted via Slack bot. Category: {result.category_used}.",
                     "date": date or "",
                     "required_level": required_level,
+                    # card_id intentionally omitted — unknown at receipt time
                 })
-                _save(db, receipt_id, result)
             except Exception as exc:
                 logger.error("DB write failed in unmatched branch: %s", exc)
                 result.log("db_write_error", str(exc))
+            # Always persist the final receipt status — even if the writes above failed.
+            _save(db, receipt_id, result)
 
         _notify(
             bot_notify_fn,
