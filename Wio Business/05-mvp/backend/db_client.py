@@ -12,8 +12,6 @@ from __future__ import annotations
 import logging
 import os
 import uuid
-from datetime import date, timedelta
-
 from supabase import create_client, Client
 
 logger = logging.getLogger(__name__)
@@ -58,14 +56,12 @@ class SupabaseClient:
     # ── Transactions ──────────────────────────────────────────────────────────
 
     def get_unreceipted_transactions(self) -> list[dict]:
-        """Return approved/pending_approval transactions missing a receipt (90-day window)."""
-        cutoff = (date.today() - timedelta(days=90)).isoformat()
+        """Return approved/pending_approval transactions missing a receipt."""
         resp = (
             self._db.table("transactions")
             .select("*")
             .eq("has_receipt", False)
             .in_("status", ["approved", "pending_approval"])
-            .gte("date", cutoff)
             .limit(200)
             .execute()
         )
