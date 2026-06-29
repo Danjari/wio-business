@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react'
-import { Upload, CheckCircle, MessageCircle, X } from 'lucide-react'
+import { CheckCircle, MessageCircle, X } from 'lucide-react'
 import { TEAM, ALL_CATEGORIES, fmtAmount, fmtDate } from '../data'
 import type { AppState } from '../App'
 import Avatar from '../components/Avatar'
@@ -15,7 +15,6 @@ const C = {
   amber: '#F59E0B',
 }
 
-type UploadState = 'idle' | 'uploading' | 'matched'
 
 const selectStyle: React.CSSProperties = {
   padding: '7px 10px', border: `1px solid ${C.border}`, borderRadius: 7,
@@ -34,9 +33,7 @@ function inAmountRange(amount: number, range: string): boolean {
   return true
 }
 
-export default function Receipts({ transactions, setTransactions, cards, showToast }: AppState) {
-  const [uploadStates, setUploadStates] = useState<Record<string, UploadState>>({})
-  const [bulkUploading, setBulkUploading] = useState(false)
+export default function Receipts({ transactions, cards }: AppState) {
   const [holderFilter, setHolderFilter] = useState('all')
   const [catFilter, setCatFilter] = useState('all')
   const [amountFilter, setAmountFilter] = useState('all')
@@ -59,29 +56,6 @@ export default function Receipts({ transactions, setTransactions, cards, showToa
     return card ? TEAM.find(t => t.id === card.holderId) : null
   }
 
-  const handleUpload = (txId: string) => {
-    setUploadStates(prev => ({ ...prev, [txId]: 'uploading' }))
-    setTimeout(() => {
-      setUploadStates(prev => ({ ...prev, [txId]: 'matched' }))
-      setTimeout(() => {
-        setTransactions(prev => prev.map(t => t.id === txId ? { ...t, hasReceipt: true, zohoSynced: true } : t))
-        setUploadStates(prev => { const n = { ...prev }; delete n[txId]; return n })
-        showToast('Receipt matched — Zoho Books updated')
-      }, 1400)
-    }, 1500)
-  }
-
-  const handleBulkUpload = () => {
-    if (bulkUploading || filtered.length === 0) return
-    setBulkUploading(true)
-    const ids = filtered.map(t => t.id)
-    setTimeout(() => {
-      setTransactions(prev => prev.map(t => ids.includes(t.id) ? { ...t, hasReceipt: true, zohoSynced: true } : t))
-      setBulkUploading(false)
-      showToast(`${ids.length} receipt${ids.length > 1 ? 's' : ''} matched — Zoho Books updated`)
-    }, 2000)
-  }
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
       {/* Header row */}
@@ -95,17 +69,8 @@ export default function Receipts({ transactions, setTransactions, cards, showToa
               </span>
             )}
           </div>
-          <div style={{ fontSize: 12, color: C.textLight, marginTop: 3 }}>Attach receipts to complete these transactions</div>
+          <div style={{ fontSize: 12, color: C.textLight, marginTop: 3 }}>Send a photo to the Wio bot in Slack — it matches and syncs automatically</div>
         </div>
-        {filtered.length > 0 && (
-          <button
-            onClick={handleBulkUpload}
-            disabled={bulkUploading}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 7, border: 'none', cursor: bulkUploading ? 'default' : 'pointer', fontFamily: 'inherit', background: bulkUploading ? '#E5E7EB' : C.purple, color: bulkUploading ? '#9CA3AF' : '#fff', fontSize: 12, fontWeight: 500, flexShrink: 0 }}
-          >
-            {bulkUploading ? <><Spin />&nbsp;Matching all…</> : <><Upload size={13} /> Upload all ({filtered.length})</>}
-          </button>
-        )}
       </div>
 
       {/* Filters */}
@@ -155,9 +120,6 @@ export default function Receipts({ transactions, setTransactions, cards, showToa
           </div>
           {filtered.map((tx, idx) => {
             const holder = getCardholder(tx.cardId)
-            const state = uploadStates[tx.id] ?? 'idle'
-            const isUploading = state === 'uploading'
-            const isMatched = state === 'matched'
             return (
               <div key={tx.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: 16, alignItems: 'center', padding: '18px 0', borderBottom: idx < filtered.length - 1 ? `1px solid ${C.border}` : 'none' }}>
                 {/* Merchant + holder */}
@@ -173,20 +135,8 @@ export default function Receipts({ transactions, setTransactions, cards, showToa
                 {/* Amount */}
                 <div style={{ fontSize: 13, fontWeight: 500, color: C.textDark, textAlign: 'right' }}>{fmtAmount(tx.amount, tx.currency)}</div>
                 {/* Action */}
-                <div>
-                  {isMatched ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#16A34A' }}>
-                      <CheckCircle size={13} /> AI matched
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => handleUpload(tx.id)}
-                      disabled={isUploading || bulkUploading}
-                      style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 7, fontSize: 12, fontWeight: 500, cursor: (isUploading || bulkUploading) ? 'default' : 'pointer', border: `1px solid ${(isUploading || bulkUploading) ? '#E5E7EB' : C.purple}`, color: (isUploading || bulkUploading) ? '#9CA3AF' : C.purple, background: 'none', fontFamily: 'inherit' }}
-                    >
-                      {isUploading ? <><Spin /> Matching…</> : <><Upload size={12} /> Upload</>}
-                    </button>
-                  )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: C.purple, whiteSpace: 'nowrap' }}>
+                  <MessageCircle size={13} /> Send via Slack
                 </div>
               </div>
             )
@@ -205,11 +155,6 @@ export default function Receipts({ transactions, setTransactions, cards, showToa
         </div>
       </div>
 
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
-}
-
-function Spin() {
-  return <span style={{ display: 'inline-block', width: 13, height: 13, border: '2px solid #E5E7EB', borderTopColor: '#9CA3AF', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
 }

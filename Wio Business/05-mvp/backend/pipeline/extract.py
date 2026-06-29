@@ -198,11 +198,22 @@ _parse_response = parse_textract_response
 
 
 _CURRENCY_MAP = {
-    "$": "USD", "us$": "USD", "usd": "USD",
+    # Compound symbols MUST come before their substrings — iteration stops on first match.
+    # e.g. "ca$" must appear before "$" or "ca$19.99" incorrectly resolves to USD.
+    "us$": "USD", "usd": "USD",
+    "ca$": "CAD", "cad": "CAD",
+    "s$": "SGD",  "sgd": "SGD",
+    "hk$": "HKD", "hkd": "HKD",
+    "a$": "AUD",  "aud": "AUD",
+    "nz$": "NZD", "nzd": "NZD",
+    "rm": "MYR",  "myr": "MYR",
+    "₹": "INR",   "inr": "INR",
     "aed": "AED", "د.إ": "AED", "dhs": "AED", "dirham": "AED",
-    "£": "GBP", "gbp": "GBP",
-    "€": "EUR", "eur": "EUR",
+    "£": "GBP",   "gbp": "GBP",
+    "€": "EUR",   "eur": "EUR",
     "sar": "SAR", "﷼": "SAR",
+    "qar": "QAR", "kwd": "KWD", "bhd": "BHD", "omr": "OMR",
+    "$": "USD",   # bare $ last — only matches if no compound symbol matched above
 }
 
 
