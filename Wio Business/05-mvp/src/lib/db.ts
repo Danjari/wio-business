@@ -120,6 +120,7 @@ export async function createCard(card: Omit<Card, 'id' | 'spent'>): Promise<Card
   const { data, error } = await supabase
     .from('cards')
     .insert({
+      id:         crypto.randomUUID(),
       holder_id:  card.holderId,
       label:      card.label,
       last4:      card.last4,
