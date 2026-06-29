@@ -39,7 +39,9 @@ class SupabaseClient:
         return str(resp.data[0]["id"])
 
     def update_receipt(self, receipt_id: str, fields: dict) -> None:
-        self._db.table("receipts").update(fields).eq("id", receipt_id).execute()
+        resp = self._db.table("receipts").update(fields).eq("id", receipt_id).select("id").execute()
+        if not resp.data:
+            logger.warning("update_receipt: 0 rows affected for receipt_id=%s — row missing or RLS blocking", receipt_id)
 
     def is_duplicate_receipt(self, slack_file_id: str) -> bool:
         """Return True if a receipt with this Slack file ID was already processed."""

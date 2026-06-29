@@ -168,12 +168,12 @@ def parse_textract_response(response: dict) -> ExtractResult:
         result.currency = _detect_currency(best_raw)
         total_conf = best_conf
 
+    result.raw_text = " | ".join(text_parts)
+
     # Store per-field confidence scores
     result.total_confidence = total_conf
     result.merchant_confidence = merchant_conf
     result.date_confidence = date_conf
-
-    result.raw_text = " | ".join(text_parts)
     result.all_fields_present = all([result.merchant, result.total is not None, result.date])
 
     # Total-first gating: if the total is missing, aggregate confidence is zero regardless
@@ -216,7 +216,8 @@ _CURRENCY_MAP = {
     "$": "USD",   # bare $ last — only matches if no compound symbol matched above
 }
 
-
+# Symbols that are purely alphabetic need word-boundary matching when scanning
+# a large block of text — otherwise "rm" matches "firm", "form", "charm", etc.
 def _detect_currency(text: str) -> Optional[str]:
     """Detect ISO currency code from a raw amount string like '$5.99' or 'AED 193.00'."""
     lower = text.lower().strip()
