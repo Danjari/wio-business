@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Optional
 
 from pipeline import extract, llm_text, llm_vision, categorize_rules, categorize_llm, match
@@ -46,6 +47,19 @@ class PipelineResult:
 
     def log(self, step: str, detail: str = "") -> None:
         self.audit_log.append({"step": step, "ts": int(time.time() * 1000), "detail": detail})
+
+
+def _normalize_date(date_str: str) -> str:
+    """Convert any extracted date format to ISO YYYY-MM-DD for Supabase."""
+    if not date_str:
+        return date_str
+    for fmt in ("%d/%m/%Y", "%m/%d/%Y", "%Y-%m-%d", "%d-%m-%Y",
+                "%d %b %Y", "%b %d, %Y", "%d %B %Y", "%B %d, %Y", "%Y/%m/%d"):
+        try:
+            return datetime.strptime(date_str.strip(), fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+    return date_str
 
 
 def run(
@@ -173,6 +187,7 @@ def run(
                 bot_notify_fn("Could not process that receipt. Please try again.")
             return result
 
+    date = _normalize_date(date or "") or None
     result.merchant = merchant
     result.total = total
     result.currency = (textract_result.currency if textract_result else None) or "AED"

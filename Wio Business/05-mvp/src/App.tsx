@@ -4,10 +4,10 @@ import {
   Users, BarChart2, BookOpen, Bell, Menu, X as XIcon,
 } from 'lucide-react'
 import {
-  TEAM, INITIAL_CARDS, INITIAL_TRANSACTIONS, INITIAL_APPROVALS,
-  ACCOUNT_BALANCE, fmtAED,
+  TEAM, ACCOUNT_BALANCE, fmtAED,
   type Card, type Transaction, type Approval, type ProcessedApproval,
 } from './data'
+import { fetchCards, fetchTransactions, fetchApprovals } from './lib/db'
 import Dashboard from './pages/Dashboard'
 import Cards from './pages/Cards'
 import Approvals from './pages/Approvals'
@@ -46,6 +46,7 @@ export type AppState = {
   setProcessed: React.Dispatch<React.SetStateAction<ProcessedApproval[]>>
   navigate: (p: Page) => void
   showToast: (message: string, variant?: 'success' | 'error') => void
+  refetch: () => Promise<void>
 }
 
 const C = {
@@ -76,10 +77,31 @@ export default function App() {
   const isMobile = useIsMobile()
   const [page, setPage] = useState<Page>('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [cards, setCards] = useState<Card[]>(INITIAL_CARDS)
-  const [transactions, setTransactions] = useState<Transaction[]>(INITIAL_TRANSACTIONS)
-  const [approvals, setApprovals] = useState<Approval[]>(INITIAL_APPROVALS)
+  const [cards, setCards] = useState<Card[]>([])
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [approvals, setApprovals] = useState<Approval[]>([])
   const [processed, setProcessed] = useState<ProcessedApproval[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const refetch = useCallback(async () => {
+    try {
+      const [c, t, { pending, processed: proc }] = await Promise.all([
+        fetchCards(),
+        fetchTransactions(),
+        fetchApprovals(),
+      ])
+      setCards(c)
+      setTransactions(t)
+      setApprovals(pending)
+      setProcessed(proc)
+    } catch (err) {
+      console.error('Supabase fetch error:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { refetch() }, [refetch])
   const [toasts, setToasts] = useState<Toast[]>([])
   const [hoveredNav, setHoveredNav] = useState<Page | null>(null)
 
@@ -117,11 +139,18 @@ export default function App() {
     processed, setProcessed,
     navigate,
     showToast,
+    refetch,
   }
 
   const founder = TEAM.find(t => t.isFounder)!
 
   const sidebarVisible = !isMobile || sidebarOpen
+
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#F7F7F9', color: '#6A6D78', fontSize: 14 }}>
+      Loading…
+    </div>
+  )
 
   return (
     <div style={{ display: 'flex', height: '100%', background: '#F7F7F9' }}>
