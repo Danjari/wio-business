@@ -15,6 +15,7 @@ This flag is logged in the audit trail every time this function is called.
 from __future__ import annotations
 
 import json
+import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -22,7 +23,9 @@ from typing import Optional
 
 from google import genai
 from google.genai import types
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
+
+logger = logging.getLogger(__name__)
 
 _MODEL_ID = os.getenv("GEMINI_VISION_MODEL", "gemini-3.5-flash")
 
@@ -48,6 +51,7 @@ Rules:
 class LLMVisionResult:
     merchant: Optional[str] = None
     total: Optional[float] = None
+    currency: Optional[str] = None
     date: Optional[str] = None
     confidence: float = 0.0
     raw_response: str = ""
@@ -63,8 +67,18 @@ def extract_from_image(image_path: str) -> LLMVisionResult:
     if not path.exists():
         raise RuntimeError(f"Image not found: {image_path}")
 
-    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-    image = Image.open(path)
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY must be set")
+    client = genai.Client(api_key=api_key)
+
+    try:
+        image = Image.open(path)
+        w, h = image.size
+        if w < 50 or h < 50:
+            raise RuntimeError(f"Image too small ({w}×{h}px) — not a valid receipt photo")
+    except (OSError, UnidentifiedImageError) as exc:
+        raise RuntimeError(f"Cannot open image file: {exc}") from exc
 
     try:
         response = client.models.generate_content(
@@ -89,6 +103,7 @@ def _parse(raw: str) -> LLMVisionResult:
     try:
         data = json.loads(raw)
         result.merchant = data.get("merchant") or None
+        result.currency = data.get("currency") or None
         result.date = data.get("date") or None
         result.confidence = float(data.get("confidence") or 0.0)
         total = data.get("total")

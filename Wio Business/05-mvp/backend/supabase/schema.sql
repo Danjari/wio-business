@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   merchant    TEXT NOT NULL,
   category    TEXT NOT NULL,
   amount      NUMERIC(12, 2) NOT NULL,
+  currency    TEXT NOT NULL DEFAULT 'AED',
   date        DATE NOT NULL,
   status      TEXT NOT NULL DEFAULT 'approved'
                 CHECK (status IN ('approved', 'pending_approval', 'declined', 'out_of_policy')),
@@ -38,6 +39,7 @@ CREATE TABLE IF NOT EXISTS transactions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_tx_has_receipt ON transactions (has_receipt, status);
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS currency TEXT NOT NULL DEFAULT 'AED';
 
 -- ── Approvals ─────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS approvals (
@@ -73,10 +75,14 @@ CREATE TABLE IF NOT EXISTS receipts (
   final_confidence     FLOAT,
   status               TEXT NOT NULL DEFAULT 'pending_extraction'
                          CHECK (status IN ('pending_extraction', 'needs_clarity', 'matched', 'unmatched_routed', 'error')),
+  slack_file_id        TEXT,
   matched_tx_id        TEXT REFERENCES transactions(id),
   audit_log            JSONB NOT NULL DEFAULT '[]',
   created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE receipts ADD COLUMN IF NOT EXISTS slack_file_id TEXT;
+
 CREATE INDEX IF NOT EXISTS idx_receipts_status ON receipts (status);
 CREATE INDEX IF NOT EXISTS idx_receipts_created ON receipts (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_receipts_slack_file_id ON receipts (slack_file_id) WHERE slack_file_id IS NOT NULL;

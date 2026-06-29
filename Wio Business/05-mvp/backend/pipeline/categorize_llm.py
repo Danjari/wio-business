@@ -125,11 +125,17 @@ def categorize(
     Pass `items` (Textract line item descriptions) for richer context.
     Returns (category, confidence).
     """
-    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+    if not merchant or not merchant.strip():
+        return _DEFAULT, 0.5
 
-    prompt = f"Merchant: {merchant}"
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        return _DEFAULT, 0.5
+    client = genai.Client(api_key=api_key)
+
+    prompt = f"Merchant: {merchant[:200]}"
     if items:
-        prompt += f"\nLine items: {', '.join(items[:12])}"
+        prompt += f"\nLine items: {', '.join(i[:80] for i in items[:12])}"
 
     for attempt in range(max_retries):
         try:
@@ -173,8 +179,11 @@ def categorize_batch(
     Returns list of category strings in the same order.
     Used by the benchmark — much cheaper and faster than one call per merchant.
     """
-    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
     n = len(entries)
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        return [_DEFAULT] * n
+    client = genai.Client(api_key=api_key)
 
     lines = []
     for i, e in enumerate(entries, 1):

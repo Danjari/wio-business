@@ -15,6 +15,8 @@ Returns a PipelineResult describing the outcome.
 
 from __future__ import annotations
 
+import logging
+import re
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -23,11 +25,14 @@ from typing import Optional
 from pipeline import extract, llm_text, llm_vision, categorize_rules, categorize_llm, match
 from pipeline.extract import ExtractResult
 
+logger = logging.getLogger(__name__)
+
 VISION_CONFIDENCE_THRESHOLD = 0.99
 LLM_TEXT_CONFIDENCE_THRESHOLD = 0.99
-# Textract must meet this per-field total confidence to skip the text LLM fallback.
-# Below this threshold, or when total is entirely absent, text fallback runs.
 TOTAL_CONFIDENCE_THRESHOLD = 80.0
+
+_MAX_AMOUNT = 1_000_000.0
+_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 @dataclass
@@ -62,6 +67,34 @@ def _normalize_date(date_str: str) -> str:
     return date_str
 
 
+def _is_valid_iso_date(date_str: str) -> bool:
+    """Return True only for plausible YYYY-MM-DD dates (2000-01-01 to 2099-12-31)."""
+    if not date_str or not _ISO_DATE_RE.match(date_str):
+        return False
+    try:
+        dt = datetime.strptime(date_str, "%Y-%m-%d")
+        return 2000 <= dt.year <= 2099
+    except ValueError:
+        return False
+
+
+def _sanitize_merchant(name: Optional[str]) -> Optional[str]:
+    if not name:
+        return None
+    cleaned = name.strip()[:200]
+    return cleaned if cleaned else None
+
+
+def _notify(bot_notify_fn, message: str) -> None:
+    """Call bot_notify_fn safely — never raises."""
+    if not bot_notify_fn:
+        return
+    try:
+        bot_notify_fn(message)
+    except Exception as exc:
+        logger.warning("bot_notify_fn raised: %s", exc)
+
+
 def run(
     receipt_id: str,
     image_path: str,
@@ -91,6 +124,7 @@ def run(
     merchant = textract_result.merchant if textract_result else None
     total = textract_result.total if textract_result else None
     date = textract_result.date if textract_result else None
+    currency: Optional[str] = textract_result.currency if textract_result else None
     extraction_method = "textract" if not textract_failed else "gemini_vision"
 
     # ── Early rejection: clearly not a receipt ───────────────────────────────
@@ -105,17 +139,14 @@ def run(
         result.error = "not_a_receipt"
         result.log("rejected", "Textract found no receipt fields — image is not a receipt")
         _save(db, receipt_id, result)
-        if bot_notify_fn:
-            bot_notify_fn(
-                "That doesn't look like a receipt — I couldn't find a merchant, amount, or date. "
-                "Please send a clear photo of an expense receipt."
-            )
+        _notify(
+            bot_notify_fn,
+            "That doesn't look like a receipt — I couldn't find a merchant, amount, or date. "
+            "Please send a clear photo of an expense receipt.",
+        )
         return result
 
     # ── Step 2: Gemini Flash text fallback ────────────────────────────────────
-    # Trigger when: Textract has no total OR total confidence is below threshold.
-    # Merchant/date issues alone do NOT trigger this — only missing/low-confidence total.
-    # Skip entirely if Textract failed (no raw_text) — fall through to vision below.
     needs_text_fallback = (
         not textract_failed
         and textract_result is not None
@@ -143,8 +174,6 @@ def run(
                 date = text_result.date
 
             # ── Step 3: Gemini Flash vision — last resort ─────────────────────
-            # Only escalate to vision when the total is STILL missing after text fallback.
-            # Don't burn a vision call just because merchant or date are uncertain.
             if total is None:
                 result.log("llm_vision_start", "total still missing after text fallback — REGULATORY NOTE: image leaves UAE region")
                 try:
@@ -158,17 +187,19 @@ def run(
                         total = vision_result.total
                     if not date and vision_result.date:
                         date = vision_result.date
+                    if not currency and vision_result.currency:
+                        currency = vision_result.currency
 
                     if vision_result.confidence < VISION_CONFIDENCE_THRESHOLD:
                         result.status = "needs_clarity"
                         result.extraction_method = extraction_method
                         result.log("needs_clarity", "vision confidence below 0.99")
                         _save(db, receipt_id, result)
-                        if bot_notify_fn:
-                            bot_notify_fn(
-                                "I couldn't read that receipt clearly enough to be confident in the amounts. "
-                                "Could you take a clearer photo and try again? (Make sure the total and date are visible.)"
-                            )
+                        _notify(
+                            bot_notify_fn,
+                            "I couldn't read that receipt clearly enough to be confident in the amounts. "
+                            "Could you take a clearer photo and try again? (Make sure the total and date are visible.)",
+                        )
                         return result
 
                 except RuntimeError as exc:
@@ -187,29 +218,40 @@ def run(
             merchant = vision_result.merchant
             total = vision_result.total
             date = vision_result.date
+            currency = vision_result.currency
             if vision_result.confidence < VISION_CONFIDENCE_THRESHOLD:
                 result.status = "needs_clarity"
                 result.extraction_method = extraction_method
                 result.log("needs_clarity", "vision confidence below 0.99")
                 _save(db, receipt_id, result)
-                if bot_notify_fn:
-                    bot_notify_fn(
-                        "I couldn't read that receipt clearly enough. "
-                        "Could you take a clearer photo showing the total and date?"
-                    )
+                _notify(
+                    bot_notify_fn,
+                    "I couldn't read that receipt clearly enough. "
+                    "Could you take a clearer photo showing the total and date?",
+                )
                 return result
         except RuntimeError as exc:
             result.error = str(exc)
             result.log("llm_vision_error", str(exc))
             _save(db, receipt_id, result)
-            if bot_notify_fn:
-                bot_notify_fn("Could not process that receipt. Please try again.")
+            _notify(bot_notify_fn, "Could not process that receipt. Please try again.")
             return result
 
+    # ── Input validation ──────────────────────────────────────────────────────
+    if total is not None and (total <= 0 or total > _MAX_AMOUNT):
+        result.log("amount_invalid", f"total={total} out of range (0, {_MAX_AMOUNT}] — discarding")
+        total = None
+
     date = _normalize_date(date or "") or None
+    if date and not _is_valid_iso_date(date):
+        result.log("date_invalid", f"date={date!r} failed validation — discarding")
+        date = None
+
+    merchant = _sanitize_merchant(merchant)
+
     result.merchant = merchant
     result.total = total
-    result.currency = (textract_result.currency if textract_result else None) or "AED"
+    result.currency = currency or "AED"
     result.date = date
     result.extraction_method = extraction_method
 
@@ -238,11 +280,11 @@ def run(
         result.log("match_skipped", "no total extracted — cannot match")
         result.status = "needs_clarity"
         _save(db, receipt_id, result)
-        if bot_notify_fn:
-            bot_notify_fn(
-                "I could read the receipt but couldn't determine the total amount. "
-                "Could you send a clearer photo showing the total clearly?"
-            )
+        _notify(
+            bot_notify_fn,
+            "I could read the receipt but couldn't determine the total amount. "
+            "Could you send a clearer photo showing the total clearly?",
+        )
         return result
 
     match_result = match.find_match(
@@ -259,56 +301,64 @@ def run(
         result.log("match_found", f"tx_id={match_result.transaction_id} score={match_result.merchant_score}")
 
         if db:
-            db.update_transaction(
-                match_result.transaction_id,
-                {"has_receipt": True, "zoho_synced": True},
-            )
-            _save(db, receipt_id, result)
+            try:
+                db.update_transaction(
+                    match_result.transaction_id,
+                    {"has_receipt": True, "zoho_synced": True},
+                )
+                _save(db, receipt_id, result)
+            except Exception as exc:
+                logger.error("DB write failed after match: %s", exc)
+                result.log("db_write_error", str(exc))
 
-        if bot_notify_fn:
-            bot_notify_fn(
-                f"✓ Receipt matched — {match_result.merchant} · "
-                f"{result.currency} {match_result.amount:,.2f} · "
-                f"Category: {result.category_used} · Zoho Books updated."
-            )
+        _notify(
+            bot_notify_fn,
+            f"✓ Receipt matched — {match_result.merchant} · "
+            f"{result.currency} {match_result.amount:,.2f} · "
+            f"Category: {result.category_used} · Zoho Books updated.",
+        )
 
     else:
         result.status = "unmatched_routed"
         result.log("match_not_found", "routing to approvals")
 
         if db:
-            required_level = _approval_level(total)
-            new_tx_id = db.create_transaction({
-                "merchant": merchant or "Unknown Merchant",
-                "amount": total,
-                "currency": result.currency or "AED",
-                "date": date or "",
-                "category": result.category_used,
-                "status": "pending_approval",
-                "has_receipt": True,
-                "zoho_synced": False,
-                "note": "Auto-created from Slack bot receipt — no matching transaction found",
-                "card_id": "c5",  # founder's petty cash card — demo default
-            })
-            db.create_approval({
-                "tx_id": new_tx_id,
-                "requested_by_id": "t1",  # Sara (founder — hardcoded for demo)
-                "amount": total,
-                "merchant": merchant or "Unknown Merchant",
-                "category": result.category_used,
-                "card_id": "c5",
-                "note": f"Receipt submitted via Slack bot. Category: {result.category_used}.",
-                "date": date or "",
-                "required_level": required_level,
-            })
-            _save(db, receipt_id, result)
+            try:
+                required_level = _approval_level(total)
+                new_tx_id = db.create_transaction({
+                    "merchant": merchant or "Unknown Merchant",
+                    "amount": total,
+                    "currency": result.currency or "AED",
+                    "date": date or "",
+                    "category": result.category_used,
+                    "status": "pending_approval",
+                    "has_receipt": True,
+                    "zoho_synced": False,
+                    "note": "Auto-created from Slack bot receipt — no matching transaction found",
+                    "card_id": "c5",  # founder's petty cash card — demo default
+                })
+                db.create_approval({
+                    "tx_id": new_tx_id,
+                    "requested_by_id": "t1",  # Sara (founder — hardcoded for demo)
+                    "amount": total,
+                    "merchant": merchant or "Unknown Merchant",
+                    "category": result.category_used,
+                    "card_id": "c5",
+                    "note": f"Receipt submitted via Slack bot. Category: {result.category_used}.",
+                    "date": date or "",
+                    "required_level": required_level,
+                })
+                _save(db, receipt_id, result)
+            except Exception as exc:
+                logger.error("DB write failed in unmatched branch: %s", exc)
+                result.log("db_write_error", str(exc))
 
-        if bot_notify_fn:
-            bot_notify_fn(
-                f"Receipt saved — {merchant or 'Unknown'} · {result.currency} {total:,.2f} · "
-                f"No matching card transaction found, so I've sent it to your approvals queue "
-                f"({_approval_level(total)} review required)."
-            )
+        _notify(
+            bot_notify_fn,
+            f"Receipt saved — {merchant or 'Unknown'} · {result.currency} {total:,.2f} · "
+            f"No matching card transaction found, so I've sent it to your approvals queue "
+            f"({_approval_level(total)} review required).",
+        )
 
     return result
 
@@ -316,19 +366,22 @@ def run(
 def _save(db, receipt_id: str, result: PipelineResult) -> None:
     if not db:
         return
-    db.update_receipt(receipt_id, {
-        "status": result.status,
-        "merchant": result.merchant,
-        "amount": result.total,
-        "currency": result.currency,
-        "date": result.date,
-        "category_rules": result.category_rules,
-        "category_llm": result.category_llm,
-        "category_used": result.category_used,
-        "extraction_method": result.extraction_method,
-        "matched_tx_id": result.matched_tx_id,
-        "audit_log": result.audit_log,
-    })
+    try:
+        db.update_receipt(receipt_id, {
+            "status": result.status,
+            "merchant": result.merchant,
+            "amount": result.total,
+            "currency": result.currency or "AED",
+            "date": result.date,
+            "category_rules": result.category_rules,
+            "category_llm": result.category_llm,
+            "category_used": result.category_used,
+            "extraction_method": result.extraction_method,
+            "matched_tx_id": result.matched_tx_id,
+            "audit_log": result.audit_log,
+        })
+    except Exception as exc:
+        logger.error("_save: DB write failed for receipt_id=%s: %s", receipt_id, exc)
 
 
 def _approval_level(amount: float) -> str:

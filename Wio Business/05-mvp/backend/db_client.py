@@ -9,12 +9,14 @@ The frontend will use the anon key + RLS-enforced policies (Phase 2).
 
 from __future__ import annotations
 
+import logging
 import os
-import time
 import uuid
-from typing import Any
+from datetime import date, timedelta
 
 from supabase import create_client, Client
+
+logger = logging.getLogger(__name__)
 
 
 def _get_client() -> Client:
@@ -34,6 +36,8 @@ class SupabaseClient:
     def create_receipt(self, data: dict) -> str:
         """Insert a new receipt row. Returns the UUID as a string."""
         resp = self._db.table("receipts").insert(data).execute()
+        if not resp.data:
+            raise RuntimeError("create_receipt: Supabase returned no data — insert may have failed")
         return str(resp.data[0]["id"])
 
     def update_receipt(self, receipt_id: str, fields: dict) -> None:
@@ -54,27 +58,36 @@ class SupabaseClient:
     # ── Transactions ──────────────────────────────────────────────────────────
 
     def get_unreceipted_transactions(self) -> list[dict]:
-        """Return approved/pending_approval transactions that are missing a receipt."""
+        """Return approved/pending_approval transactions missing a receipt (90-day window)."""
+        cutoff = (date.today() - timedelta(days=90)).isoformat()
         resp = (
             self._db.table("transactions")
             .select("*")
             .eq("has_receipt", False)
             .in_("status", ["approved", "pending_approval"])
+            .gte("date", cutoff)
+            .limit(200)
             .execute()
         )
         return resp.data or []
 
     def update_transaction(self, tx_id: str, fields: dict) -> None:
-        self._db.table("transactions").update(fields).eq("id", tx_id).execute()
+        resp = self._db.table("transactions").update(fields).eq("id", tx_id).select("id").execute()
+        if not resp.data:
+            logger.warning("update_transaction: 0 rows affected for tx_id=%s — RLS may be blocking", tx_id)
 
     def create_transaction(self, data: dict) -> str:
         if "id" not in data:
-            data = {"id": f"tx_{uuid.uuid4().hex[:12]}", **data}
+            data = {"id": str(uuid.uuid4()), **data}
         resp = self._db.table("transactions").insert(data).execute()
+        if not resp.data:
+            raise RuntimeError("create_transaction: Supabase returned no data — insert may have failed")
         return str(resp.data[0]["id"])
 
     # ── Approvals ─────────────────────────────────────────────────────────────
 
     def create_approval(self, data: dict) -> str:
         resp = self._db.table("approvals").insert(data).execute()
+        if not resp.data:
+            raise RuntimeError("create_approval: Supabase returned no data — insert may have failed")
         return str(resp.data[0]["id"])

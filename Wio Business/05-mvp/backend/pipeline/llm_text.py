@@ -55,7 +55,10 @@ def extract_from_text(raw_text: str) -> LLMTextResult:
     if not raw_text.strip():
         return LLMTextResult(confidence=0.0)
 
-    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY must be set")
+    client = genai.Client(api_key=api_key)
     # Keep the tail of the text — receipt totals appear at the bottom, not the top.
     truncated = raw_text[-3000:] if len(raw_text) > 3000 else raw_text
 

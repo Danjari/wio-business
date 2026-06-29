@@ -50,11 +50,17 @@ def handle_event(event: dict, say, client, db: SupabaseClient | None) -> None:
         _handle_text((event.get("text") or "").strip(), say)
         return
 
+    file_meta = image_files[0]
+    file_size_bytes = file_meta.get("size", 0)
+    if file_size_bytes > 8 * 1024 * 1024:
+        say("That file is too large (over 8 MB). Please send a compressed photo of the receipt.")
+        return
+
     say("📄 Got it! Processing your receipt...")
 
     image_path = None
     try:
-        file_id = image_files[0]["id"]
+        file_id = file_meta["id"]
 
         # Duplicate check — same file already processed
         if db and db.is_duplicate_receipt(file_id):
@@ -62,6 +68,13 @@ def handle_event(event: dict, say, client, db: SupabaseClient | None) -> None:
             return
 
         image_path = _download_file(file_id, client)
+
+        # A valid image must be larger than a minimal placeholder or auth-error page
+        if Path(image_path).stat().st_size < 1000:
+            Path(image_path).unlink(missing_ok=True)
+            image_path = None
+            say("The file couldn't be downloaded properly. Please try sending the photo again.")
+            return
 
         receipt_id = "demo"
         if db:
