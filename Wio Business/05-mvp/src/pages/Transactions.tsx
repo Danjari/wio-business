@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import { Search, CheckCircle2, AlertCircle, Clock, X } from 'lucide-react'
-import { TEAM, ALL_CATEGORIES, fmtAED, fmtDate } from '../data'
+import { TEAM, ALL_CATEGORIES, fmtAmount, fmtDate, toAED } from '../data'
 import type { AppState } from '../App'
 
 const C = {
@@ -39,21 +39,23 @@ function getHolderId(cardId: string, cards: AppState['cards']): string {
   return cards.find(c => c.id === cardId)?.holderId ?? ''
 }
 
-function inAmountRange(amount: number, range: string): boolean {
+function inAmountRange(amount: number, currency: string, range: string): boolean {
   if (range === 'all') return true
-  if (range === 'u500') return amount < 500
-  if (range === '500-2000') return amount >= 500 && amount <= 2000
-  if (range === '2000-5000') return amount > 2000 && amount <= 5000
-  if (range === 'a5000') return amount > 5000
+  const aed = toAED(amount, currency)
+  if (range === 'u500') return aed < 500
+  if (range === '500-2000') return aed >= 500 && aed <= 2000
+  if (range === '2000-5000') return aed > 2000 && aed <= 5000
+  if (range === 'a5000') return aed > 5000
   return true
 }
 
 function inDateRange(date: string, range: string): boolean {
   if (range === 'all') return true
   const d = new Date(date)
-  if (range === 'month') return d >= new Date('2026-06-01')
-  if (range === 'last30') { const c = new Date('2026-06-26'); c.setDate(c.getDate() - 30); return d >= c }
-  if (range === 'last90') { const c = new Date('2026-06-26'); c.setDate(c.getDate() - 90); return d >= c }
+  const now = new Date()
+  if (range === 'month') return d >= new Date(now.getFullYear(), now.getMonth(), 1)
+  if (range === 'last30') { const c = new Date(); c.setDate(c.getDate() - 30); return d >= c }
+  if (range === 'last90') { const c = new Date(); c.setDate(c.getDate() - 90); return d >= c }
   return true
 }
 
@@ -75,7 +77,7 @@ export default function Transactions({ transactions, cards }: AppState) {
     if (catFilter !== 'all') list = list.filter(t => t.category === catFilter)
     if (statusFilter !== 'all') list = list.filter(t => t.status === statusFilter)
     list = list.filter(t => inDateRange(t.date, dateFilter))
-    list = list.filter(t => inAmountRange(t.amount, amountFilter))
+    list = list.filter(t => inAmountRange(t.amount, t.currency, amountFilter))
     return list
   }, [transactions, search, holderFilter, catFilter, statusFilter, dateFilter, amountFilter, cards])
 
@@ -178,7 +180,7 @@ export default function Transactions({ transactions, cards }: AppState) {
                 <td style={{ padding: '13px 14px 13px 0' }}>
                   <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, background: '#F3F4F6', color: C.textMid }}>{tx.category}</span>
                 </td>
-                <td style={{ padding: '13px 14px 13px 0', fontSize: 13, fontWeight: 500, color: C.textDark, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtAED(tx.amount)}</td>
+                <td style={{ padding: '13px 14px 13px 0', fontSize: 13, fontWeight: 500, color: C.textDark, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtAmount(tx.amount, tx.currency)}</td>
                 <td style={{ padding: '13px 14px 13px 0' }}><StatusBadge status={tx.status} /></td>
                 <td style={{ padding: '13px 14px 13px 0' }}>
                   {tx.hasReceipt ? <CheckCircle2 size={15} color="#16A34A" /> : <AlertCircle size={15} color={C.amber} />}

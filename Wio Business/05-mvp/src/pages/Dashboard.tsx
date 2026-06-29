@@ -1,5 +1,5 @@
 import React from 'react'
-import { TEAM, fmtAED, fmtDate } from '../data'
+import { TEAM, fmtAED, fmtAmount, fmtDate, toAED } from '../data'
 import type { AppState } from '../App'
 import Avatar from '../components/Avatar'
 
@@ -48,8 +48,15 @@ export default function Dashboard({ cards, transactions, approvals, navigate }: 
     return TEAM.find(t => t.id === card.holderId) ?? null
   }
 
+  const now = new Date()
+  const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+  const monthLabel = now.toLocaleDateString('en-AE', { month: 'long', year: 'numeric' })
+  const monthSpend = transactions
+    .filter(t => t.date >= monthStart && t.status === 'approved')
+    .reduce((s, t) => s + toAED(t.amount, t.currency), 0)
+
   const kpis = [
-    { label: "This month's spend", value: fmtAED(8205), sub: 'June 2026', flagColor: undefined as string | undefined, onClick: undefined as (() => void) | undefined },
+    { label: "This month's spend", value: fmtAED(monthSpend), sub: monthLabel, flagColor: undefined as string | undefined, onClick: undefined as (() => void) | undefined },
     { label: 'Active cards', value: String(cards.filter(c => c.status === 'active').length), sub: 'across team members', flagColor: undefined, onClick: undefined },
     { label: 'Pending approvals', value: String(pendingCount), sub: pendingCount > 0 ? 'requires your attention' : 'all clear', flagColor: pendingCount > 0 ? C.red : undefined, onClick: () => navigate('approvals') },
     { label: 'Missing receipts', value: String(missingCount), sub: 'transactions need docs', flagColor: missingCount > 0 ? C.amber : undefined, onClick: () => navigate('receipts') },
@@ -160,7 +167,7 @@ export default function Dashboard({ cards, transactions, approvals, navigate }: 
                   <td style={{ padding: '14px 16px 14px 0', fontSize: 13, color: C.textDark }}>{tx.merchant}</td>
                   <td style={{ padding: '14px 16px 14px 0', fontSize: 12, color: C.textMid }}>{holder?.name ?? '—'}</td>
                   <td style={{ padding: '14px 16px 14px 0', fontSize: 12, color: C.textMid }}>{tx.category}</td>
-                  <td style={{ padding: '14px 0', fontSize: 13, fontWeight: 500, color: C.textDark, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtAED(tx.amount)}</td>
+                  <td style={{ padding: '14px 0', fontSize: 13, fontWeight: 500, color: C.textDark, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtAmount(tx.amount, tx.currency)}</td>
                   <td style={{ padding: '14px 0 14px 16px', textAlign: 'right' }}><StatusBadge status={tx.status} /></td>
                 </tr>
               )

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import { TrendingUp, CheckCircle2, Shield, User, AlertCircle } from 'lucide-react'
-import { TEAM, fmtAED } from '../data'
+import { TEAM, fmtAED, toAED } from '../data'
 import type { AppState } from '../App'
 import Avatar from '../components/Avatar'
 
@@ -26,9 +26,10 @@ const PERIODS: { value: Period; label: string }[] = [
 ]
 
 function periodCutoff(period: Period): string {
-  if (period === 'month') return '2026-06-01'
-  if (period === '3months') return '2026-03-26'
-  if (period === '6months') return '2025-12-26'
+  const now = new Date()
+  if (period === 'month') return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+  if (period === '3months') { const d = new Date(); d.setMonth(d.getMonth() - 3); return d.toISOString().slice(0, 10) }
+  if (period === '6months') { const d = new Date(); d.setMonth(d.getMonth() - 6); return d.toISOString().slice(0, 10) }
   return '2000-01-01'
 }
 
@@ -50,19 +51,19 @@ export default function Reporting({ transactions, cards }: AppState) {
   }, [transactions, period])
 
   const approved = periodTxs.filter(t => t.status === 'approved')
-  const totalSpend = approved.reduce((s, t) => s + t.amount, 0)
+  const totalSpend = approved.reduce((s, t) => s + toAED(t.amount, t.currency), 0)
   const avgTx = approved.length > 0 ? Math.round(totalSpend / approved.length) : 0
   const captureRate = approved.length > 0 ? Math.round((approved.filter(t => t.hasReceipt).length / approved.length) * 100) : 0
 
   const catMap: Record<string, number> = {}
-  approved.forEach(t => { catMap[t.category] = (catMap[t.category] ?? 0) + t.amount })
+  approved.forEach(t => { catMap[t.category] = (catMap[t.category] ?? 0) + toAED(t.amount, t.currency) })
   const catList = Object.entries(catMap).sort((a, b) => b[1] - a[1])
   const maxCat = catList[0]?.[1] ?? 1
 
   const memberMap: Record<string, number> = {}
   approved.forEach(t => {
     const card = cards.find(c => c.id === t.cardId)
-    if (card) memberMap[card.holderId] = (memberMap[card.holderId] ?? 0) + t.amount
+    if (card) memberMap[card.holderId] = (memberMap[card.holderId] ?? 0) + toAED(t.amount, t.currency)
   })
   const memberList = Object.entries(memberMap).sort((a, b) => b[1] - a[1])
   const maxMember = memberList[0]?.[1] ?? 1

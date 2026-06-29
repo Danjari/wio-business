@@ -8,6 +8,7 @@ import {
   type Card, type Transaction, type Approval, type ProcessedApproval,
 } from './data'
 import { fetchCards, fetchTransactions, fetchApprovals } from './lib/db'
+import { supabase } from './lib/supabase'
 import Dashboard from './pages/Dashboard'
 import Cards from './pages/Cards'
 import Approvals from './pages/Approvals'
@@ -102,6 +103,17 @@ export default function App() {
   }, [])
 
   useEffect(() => { refetch() }, [refetch])
+
+  // Realtime — refetch whenever transactions, approvals, or receipts change in Supabase
+  useEffect(() => {
+    const channel = supabase
+      .channel('db-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => refetch())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'approvals' }, () => refetch())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'receipts' }, () => refetch())
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [refetch])
   const [toasts, setToasts] = useState<Toast[]>([])
   const [hoveredNav, setHoveredNav] = useState<Page | null>(null)
 

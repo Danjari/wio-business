@@ -39,6 +39,18 @@ class SupabaseClient:
     def update_receipt(self, receipt_id: str, fields: dict) -> None:
         self._db.table("receipts").update(fields).eq("id", receipt_id).execute()
 
+    def is_duplicate_receipt(self, slack_file_id: str) -> bool:
+        """Return True if a receipt with this Slack file ID was already processed."""
+        resp = (
+            self._db.table("receipts")
+            .select("id")
+            .eq("slack_file_id", slack_file_id)
+            .neq("status", "error")
+            .limit(1)
+            .execute()
+        )
+        return len(resp.data or []) > 0
+
     # ── Transactions ──────────────────────────────────────────────────────────
 
     def get_unreceipted_transactions(self) -> list[dict]:

@@ -55,6 +55,12 @@ def handle_event(event: dict, say, client, db: SupabaseClient | None) -> None:
     image_path = None
     try:
         file_id = image_files[0]["id"]
+
+        # Duplicate check — same file already processed
+        if db and db.is_duplicate_receipt(file_id):
+            say("I've already processed this receipt. Check your Transactions or Approvals tab.")
+            return
+
         image_path = _download_file(file_id, client)
 
         receipt_id = "demo"
@@ -65,6 +71,7 @@ def handle_event(event: dict, say, client, db: SupabaseClient | None) -> None:
                 "team_member_id": _DEMO_TEAM_MEMBER_ID,
                 "currency": "AED",
                 "status": "pending_extraction",
+                "slack_file_id": file_id,
                 "audit_log": [],
             })
 
@@ -136,10 +143,8 @@ def _download_file(file_id: str, slack_client) -> str:
 
 
 def _handle_text(text: str, say) -> None:
-    if text.lower() in ("/start", "hi", "hello", "help", "/help"):
-        say(
-            "👋 Hi! Send me a photo of your receipt and I'll extract, categorize, "
-            "and match it to your Wio Business transactions automatically.\n\n"
-            "_Note: This demo attributes all receipts to Sara (founder). "
-            "Team member registration coming soon._"
-        )
+    say(
+        "👋 I'm the Wio receipt bot — send me a photo of a receipt and I'll extract the details, "
+        "categorize the expense, and match it to your transactions automatically.\n\n"
+        "_Tip: Just attach an image directly in this chat._"
+    )

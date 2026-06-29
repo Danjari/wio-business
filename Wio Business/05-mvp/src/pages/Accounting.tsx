@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { CheckCircle2, Clock, RefreshCw } from 'lucide-react'
-import { TEAM, CHART_OF_ACCOUNTS, fmtAED, fmtDate } from '../data'
+import { TEAM, CHART_OF_ACCOUNTS, fmtAmount, fmtDate } from '../data'
 import type { AppState } from '../App'
 
 const C = {
@@ -112,7 +112,7 @@ export default function Accounting({ transactions, cards, showToast }: AppState)
               >
                 <td style={{ padding: '13px 14px 13px 0', fontSize: 12, color: C.textLight }}>{fmtDate(tx.date)}</td>
                 <td style={{ padding: '13px 14px 13px 0', fontSize: 13, color: C.textDark }}>{tx.merchant}</td>
-                <td style={{ padding: '13px 14px 13px 0', fontSize: 13, fontWeight: 500, color: C.textDark, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtAED(tx.amount)}</td>
+                <td style={{ padding: '13px 14px 13px 0', fontSize: 13, fontWeight: 500, color: C.textDark, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtAmount(tx.amount, tx.currency)}</td>
                 <td style={{ padding: '13px 14px 13px 0', fontSize: 12, color: C.textMid }}>{tx.category}</td>
                 <td style={{ padding: '13px 14px 13px 0', fontSize: 11, color: C.textLight }}>{CHART_OF_ACCOUNTS[tx.category] ?? '6999 — Miscellaneous'}</td>
                 <td style={{ padding: '13px 0' }}>
@@ -148,7 +148,7 @@ export default function Accounting({ transactions, cards, showToast }: AppState)
                     {tx.status === 'pending_approval' && <span style={{ marginLeft: 8, color: '#D97706' }}>· Awaiting approval</span>}
                   </div>
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 500, color: C.textDark }}>{fmtAED(tx.amount)}</div>
+                <div style={{ fontSize: 13, fontWeight: 500, color: C.textDark }}>{fmtAmount(tx.amount, tx.currency)}</div>
               </div>
             )
           })}
