@@ -21,7 +21,7 @@ const selectStyle: React.CSSProperties = {
   fontSize: 12, color: C.textMid, background: '#fff', outline: 'none', cursor: 'pointer',
 }
 
-export default function Approvals({ approvals, setApprovals, processed, setProcessed, transactions, setTransactions, showToast }: AppState) {
+export default function Approvals({ approvals, setApprovals, processed, setProcessed, transactions, setTransactions, showToast, refetch }: AppState) {
   const [tab, setTab] = useState<'pending' | 'processed'>('pending')
   const [outcomeFilter, setOutcomeFilter] = useState<'all' | 'approved' | 'declined'>('all')
   const [levelFilter, setLevelFilter] = useState<'all' | 'manager' | 'founder'>('all')
@@ -38,22 +38,40 @@ export default function Approvals({ approvals, setApprovals, processed, setProce
   const isFiltered = outcomeFilter !== 'all' || levelFilter !== 'all' || requesterFilter !== 'all'
   const clearFilters = () => { setOutcomeFilter('all'); setLevelFilter('all'); setRequesterFilter('all') }
 
-  const handleApprove = (id: string) => {
+  const handleApprove = async (id: string) => {
     const item = approvals.find(a => a.id === id)
     if (!item) return
+    // Optimistic update
     setApprovals(prev => prev.filter(a => a.id !== id))
     setTransactions(prev => prev.map(t => t.id === item.txId ? { ...t, status: 'approved' as const } : t))
     setProcessed(prev => [...prev, { ...item, outcome: 'approved', processedAt: new Date().toISOString() } as ProcessedApproval])
-    showToast('Transaction approved')
+    try {
+      const { resolveApproval } = await import('../lib/db')
+      await resolveApproval(item.id, item.txId, 'approved')
+      showToast('Transaction approved')
+    } catch (err) {
+      console.error('Approve failed:', err)
+      showToast('Failed to save — please refresh', 'error')
+      refetch()
+    }
   }
 
-  const handleDecline = (id: string) => {
+  const handleDecline = async (id: string) => {
     const item = approvals.find(a => a.id === id)
     if (!item) return
+    // Optimistic update
     setApprovals(prev => prev.filter(a => a.id !== id))
     setTransactions(prev => prev.map(t => t.id === item.txId ? { ...t, status: 'declined' as const } : t))
     setProcessed(prev => [...prev, { ...item, outcome: 'declined', processedAt: new Date().toISOString() } as ProcessedApproval])
-    showToast('Transaction declined', 'error')
+    try {
+      const { resolveApproval } = await import('../lib/db')
+      await resolveApproval(item.id, item.txId, 'declined')
+      showToast('Transaction declined', 'error')
+    } catch (err) {
+      console.error('Decline failed:', err)
+      showToast('Failed to save — please refresh', 'error')
+      refetch()
+    }
   }
 
   return (

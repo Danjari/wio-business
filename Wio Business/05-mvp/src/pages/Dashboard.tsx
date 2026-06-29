@@ -1,5 +1,5 @@
 import React from 'react'
-import { TEAM, fmtAED, fmtDate } from '../data'
+import { TEAM, fmtAED, fmtAmount, fmtDate } from '../data'
 import type { AppState } from '../App'
 import Avatar from '../components/Avatar'
 
@@ -160,7 +160,7 @@ export default function Dashboard({ cards, transactions, approvals, navigate }: 
                   <td style={{ padding: '14px 16px 14px 0', fontSize: 13, color: C.textDark }}>{tx.merchant}</td>
                   <td style={{ padding: '14px 16px 14px 0', fontSize: 12, color: C.textMid }}>{holder?.name ?? '—'}</td>
                   <td style={{ padding: '14px 16px 14px 0', fontSize: 12, color: C.textMid }}>{tx.category}</td>
-                  <td style={{ padding: '14px 0', fontSize: 13, fontWeight: 500, color: C.textDark, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtAED(tx.amount)}</td>
+                  <td style={{ padding: '14px 0', fontSize: 13, fontWeight: 500, color: C.textDark, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtAmount(tx.amount, tx.currency)}</td>
                   <td style={{ padding: '14px 0 14px 16px', textAlign: 'right' }}><StatusBadge status={tx.status} /></td>
                 </tr>
               )

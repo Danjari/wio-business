@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import { Upload, CheckCircle, MessageCircle, X } from 'lucide-react'
-import { TEAM, ALL_CATEGORIES, fmtAED, fmtDate } from '../data'
+import { TEAM, ALL_CATEGORIES, fmtAmount, fmtDate } from '../data'
 import type { AppState } from '../App'
 import Avatar from '../components/Avatar'
 
@@ -171,7 +171,7 @@ export default function Receipts({ transactions, setTransactions, cards, showToa
                 {/* Date */}
                 <div style={{ fontSize: 12, color: C.textLight }}>{fmtDate(tx.date)}</div>
                 {/* Amount */}
-                <div style={{ fontSize: 13, fontWeight: 500, color: C.textDark, textAlign: 'right' }}>{fmtAED(tx.amount)}</div>
+                <div style={{ fontSize: 13, fontWeight: 500, color: C.textDark, textAlign: 'right' }}>{fmtAmount(tx.amount, tx.currency)}</div>
                 {/* Action */}
                 <div>
                   {isMatched ? (

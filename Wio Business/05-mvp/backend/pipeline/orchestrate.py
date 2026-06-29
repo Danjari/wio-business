@@ -93,6 +93,25 @@ def run(
     date = textract_result.date if textract_result else None
     extraction_method = "textract" if not textract_failed else "gemini_vision"
 
+    # ── Early rejection: clearly not a receipt ───────────────────────────────
+    if (
+        not textract_failed
+        and textract_result is not None
+        and textract_result.merchant is None
+        and textract_result.total is None
+        and textract_result.date is None
+    ):
+        result.status = "error"
+        result.error = "not_a_receipt"
+        result.log("rejected", "Textract found no receipt fields — image is not a receipt")
+        _save(db, receipt_id, result)
+        if bot_notify_fn:
+            bot_notify_fn(
+                "That doesn't look like a receipt — I couldn't find a merchant, amount, or date. "
+                "Please send a clear photo of an expense receipt."
+            )
+        return result
+
     # ── Step 2: Gemini Flash text fallback ────────────────────────────────────
     # Trigger when: Textract has no total OR total confidence is below threshold.
     # Merchant/date issues alone do NOT trigger this — only missing/low-confidence total.
@@ -231,6 +250,7 @@ def run(
         extracted_total=total,
         extracted_date=date or "",
         transactions=transactions,
+        extracted_currency=result.currency or "AED",
     )
 
     if match_result:
@@ -261,6 +281,7 @@ def run(
             new_tx_id = db.create_transaction({
                 "merchant": merchant or "Unknown Merchant",
                 "amount": total,
+                "currency": result.currency or "AED",
                 "date": date or "",
                 "category": result.category_used,
                 "status": "pending_approval",

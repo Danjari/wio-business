@@ -3,9 +3,13 @@ Transaction matching: find an existing transaction that corresponds to an incomi
 
 Matching criteria (all must pass):
   1. hasReceipt is False — don't match already-receipted transactions
-  2. Amount within ±5% of extracted total
+  2. Amount within tolerance of extracted total (5% same-currency, 10% cross-currency)
   3. Date within ±3 calendar days
   4. Merchant name RapidFuzz similarity >= 0.70
+
+FX conversion uses live rates from frankfurter.app (ECB-backed, no API key needed),
+cached for 1 hour. Falls back to hardcoded rates on any network failure.
+USD/AED is always 3.6725 (fixed currency board peg — API not consulted).
 
 The first (best-scoring) match is returned. If no match, returns None and the
 caller routes the receipt to the Approvals queue.
@@ -13,17 +17,83 @@ caller routes the receipt to the Approvals queue.
 
 from __future__ import annotations
 
+import json
 import re
+import threading
+import time
+import urllib.request
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional
 
 from rapidfuzz import fuzz
 
 
-AMOUNT_TOLERANCE = 0.05   # ±5%
-DATE_WINDOW_DAYS = 3      # ±3 days
-MERCHANT_THRESHOLD = 0.70 # RapidFuzz token_sort_ratio >= 70
+AMOUNT_TOLERANCE_SAME = 0.05   # ±5%  — same currency (rounding only)
+AMOUNT_TOLERANCE_FX   = 0.10   # ±10% — cross-currency (live rate + bank spread 0.5–3%)
+DATE_WINDOW_DAYS  = 3          # ±3 calendar days
+MERCHANT_THRESHOLD = 0.70      # RapidFuzz token_sort_ratio >= 70
+
+# Fallback rates used when the live fetch fails.
+# USD is the fixed AED peg and is always used directly (never overridden by API).
+_FALLBACK_RATES: dict[str, float] = {
+    'USD': 3.6725,
+    'EUR': 4.02,
+    'GBP': 4.65,
+    'SAR': 0.9793,
+    'KWD': 11.97,
+    'BHD': 9.74,
+    'QAR': 1.008,
+    'OMR': 9.54,
+    'MYR': 0.83,
+    'INR': 0.044,
+    'SGD': 2.72,
+    'CAD': 2.70,
+    'AUD': 2.37,
+}
+
+_TRACKED = [c for c in _FALLBACK_RATES if c != 'USD']  # USD handled separately
+
+_rate_cache: dict[str, float] = {}
+_rate_cache_expiry: float = 0.0
+_rate_lock = threading.Lock()
+_CACHE_TTL = 3600  # 1 hour — rates update daily, no need to fetch more often
+
+
+def _fetch_live_rates() -> dict[str, float]:
+    """
+    Fetch today's rates from frankfurter.app: AED → [all tracked currencies].
+    Inverts each to get [currency] → AED. Returns empty dict on any error.
+    Timeout is 3 s so a network hiccup never blocks the pipeline for long.
+    """
+    symbols = ",".join(_TRACKED)
+    url = f"https://api.frankfurter.app/latest?from=AED&to={symbols}"
+    try:
+        with urllib.request.urlopen(url, timeout=3) as resp:  # noqa: S310
+            data = json.loads(resp.read())
+        aed_to_x: dict[str, float] = data.get("rates", {})
+        return {
+            currency: 1.0 / rate
+            for currency, rate in aed_to_x.items()
+            if rate > 0
+        }
+    except Exception:
+        return {}
+
+
+def _get_rates() -> dict[str, float]:
+    """Return cached X→AED rates, refreshing if the 1-hour TTL has elapsed."""
+    global _rate_cache, _rate_cache_expiry
+    now = time.monotonic()
+    with _rate_lock:
+        if now < _rate_cache_expiry and _rate_cache:
+            return _rate_cache
+        live = _fetch_live_rates()
+        rates = {**_FALLBACK_RATES, **live}
+        rates["USD"] = 3.6725  # peg — never let the API override this
+        _rate_cache = rates
+        _rate_cache_expiry = now + _CACHE_TTL
+        return rates
 
 
 @dataclass
@@ -37,11 +107,22 @@ class MatchResult:
     merchant_score: float
 
 
+def _to_aed(amount: float, currency: str) -> float:
+    """Convert any currency to AED using live-cached rates. Returns amount unchanged if unknown."""
+    currency = currency.upper().strip()
+    if currency == "AED":
+        return amount
+    rates = _get_rates()
+    rate = rates.get(currency)
+    return amount * rate if rate else amount
+
+
 def find_match(
     extracted_merchant: str,
     extracted_total: float,
     extracted_date: str,
     transactions: list[dict],
+    extracted_currency: str = 'AED',
 ) -> Optional[MatchResult]:
     """
     Find the best matching transaction from a list.
@@ -49,6 +130,9 @@ def find_match(
     transactions: list of dicts with keys:
         id, merchant, amount, date (YYYY-MM-DD), hasReceipt (bool), status
     """
+    # Normalise extracted amount to AED for comparison against AED-denominated transactions
+    extracted_aed = _to_aed(extracted_total, extracted_currency)
+
     extracted_dt = _parse_date(extracted_date)
     candidates: list[tuple[float, MatchResult]] = []
 
@@ -60,13 +144,20 @@ def find_match(
             continue
 
         tx_amount = float(tx.get("amount") or 0)
+        tx_currency = (tx.get("currency") or "AED").upper()
         tx_date = _parse_date(tx.get("date") or "")
 
-        # Amount gate
-        if tx_amount <= 0 or extracted_total <= 0:
+        # Normalise tx amount to AED too (in case it was stored in foreign currency)
+        tx_aed = _to_aed(tx_amount, tx_currency)
+
+        # Amount gate — compare both sides in AED.
+        # Use a wider tolerance for cross-currency matches to absorb bank FX spread (0.5–3%).
+        if tx_aed <= 0 or extracted_aed <= 0:
             continue
-        amount_diff = abs(tx_amount - extracted_total) / max(tx_amount, extracted_total)
-        if amount_diff > AMOUNT_TOLERANCE:
+        amount_diff = abs(tx_aed - extracted_aed) / max(tx_aed, extracted_aed)
+        is_cross_currency = extracted_currency.upper() != tx_currency.upper()
+        tolerance = AMOUNT_TOLERANCE_FX if is_cross_currency else AMOUNT_TOLERANCE_SAME
+        if amount_diff > tolerance:
             continue
 
         # Date gate

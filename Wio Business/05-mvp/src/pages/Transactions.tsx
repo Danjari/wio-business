@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import { Search, CheckCircle2, AlertCircle, Clock, X } from 'lucide-react'
-import { TEAM, ALL_CATEGORIES, fmtAED, fmtDate } from '../data'
+import { TEAM, ALL_CATEGORIES, fmtAmount, fmtDate } from '../data'
 import type { AppState } from '../App'
 
 const C = {
@@ -178,7 +178,7 @@ export default function Transactions({ transactions, cards }: AppState) {
                 <td style={{ padding: '13px 14px 13px 0' }}>
                   <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, background: '#F3F4F6', color: C.textMid }}>{tx.category}</span>
                 </td>
-                <td style={{ padding: '13px 14px 13px 0', fontSize: 13, fontWeight: 500, color: C.textDark, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtAED(tx.amount)}</td>
+                <td style={{ padding: '13px 14px 13px 0', fontSize: 13, fontWeight: 500, color: C.textDark, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtAmount(tx.amount, tx.currency)}</td>
                 <td style={{ padding: '13px 14px 13px 0' }}><StatusBadge status={tx.status} /></td>
                 <td style={{ padding: '13px 14px 13px 0' }}>
                   {tx.hasReceipt ? <CheckCircle2 size={15} color="#16A34A" /> : <AlertCircle size={15} color={C.amber} />}

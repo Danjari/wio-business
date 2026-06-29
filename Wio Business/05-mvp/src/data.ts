@@ -26,6 +26,7 @@ export type Transaction = {
   merchant: string
   category: string
   amount: number
+  currency: string
   date: string
   status: TxStatus
   hasReceipt: boolean
@@ -81,21 +82,21 @@ export const INITIAL_CARDS: Card[] = [
 ]
 
 export const INITIAL_TRANSACTIONS: Transaction[] = [
-  { id: 'tx01', cardId: 'c2', merchant: 'Nobu Dubai', category: 'Meals & Entertainment', amount: 1840, date: '2026-06-24', status: 'approved', hasReceipt: true, zohoSynced: true },
-  { id: 'tx02', cardId: 'c3', merchant: 'Google Ads', category: 'Marketing & Advertising', amount: 450, date: '2026-06-24', status: 'approved', hasReceipt: true, zohoSynced: true },
-  { id: 'tx03', cardId: 'c4', merchant: 'Emirates Business Class', category: 'Travel & Transport', amount: 3200, date: '2026-06-23', status: 'pending_approval', hasReceipt: false, zohoSynced: false, note: 'Business class to Riyadh — ADIPEC partner meeting' },
-  { id: 'tx04', cardId: 'c2', merchant: 'Jumeirah Beach Hotel', category: 'Travel & Transport', amount: 780, date: '2026-06-23', status: 'approved', hasReceipt: false, zohoSynced: false },
-  { id: 'tx05', cardId: 'c1', merchant: 'IKEA Dubai', category: 'Office & Stationery', amount: 1140, date: '2026-06-22', status: 'approved', hasReceipt: true, zohoSynced: true },
-  { id: 'tx06', cardId: 'c3', merchant: 'Canva Pro', category: 'Technology & Software', amount: 120, date: '2026-06-22', status: 'approved', hasReceipt: true, zohoSynced: true },
-  { id: 'tx07', cardId: 'c5', merchant: 'Carrefour Mall', category: 'Office & Stationery', amount: 85, date: '2026-06-21', status: 'approved', hasReceipt: false, zohoSynced: false },
-  { id: 'tx08', cardId: 'c4', merchant: 'DIFC Restaurant', category: 'Meals & Entertainment', amount: 560, date: '2026-06-21', status: 'approved', hasReceipt: false, zohoSynced: false },
-  { id: 'tx09', cardId: 'c2', merchant: 'Rotana Hotel Abu Dhabi', category: 'Travel & Transport', amount: 6200, date: '2026-06-20', status: 'pending_approval', hasReceipt: false, zohoSynced: false, note: '3-night stay for GITEX client sprint' },
-  { id: 'tx10', cardId: 'c1', merchant: 'Staples UAE', category: 'Office & Stationery', amount: 200, date: '2026-06-20', status: 'approved', hasReceipt: true, zohoSynced: true },
-  { id: 'tx11', cardId: 'c3', merchant: 'Meta Ads', category: 'Marketing & Advertising', amount: 320, date: '2026-06-19', status: 'approved', hasReceipt: true, zohoSynced: true },
-  { id: 'tx12', cardId: 'c4', merchant: 'Al Maha Desert Resort', category: 'Meals & Entertainment', amount: 1200, date: '2026-06-18', status: 'approved', hasReceipt: true, zohoSynced: true },
-  { id: 'tx13', cardId: 'c2', merchant: 'Uber Business', category: 'Travel & Transport', amount: 145, date: '2026-06-18', status: 'approved', hasReceipt: true, zohoSynced: true },
-  { id: 'tx14', cardId: 'c1', merchant: 'du Telecom', category: 'Utilities & Telecom', amount: 399, date: '2026-06-17', status: 'approved', hasReceipt: true, zohoSynced: true },
-  { id: 'tx15', cardId: 'c3', merchant: 'HubSpot', category: 'Technology & Software', amount: 680, date: '2026-06-17', status: 'approved', hasReceipt: true, zohoSynced: true },
+  { id: 'tx01', cardId: 'c2', merchant: 'Nobu Dubai', category: 'Meals & Entertainment', amount: 1840, currency: 'AED', date: '2026-06-24', status: 'approved', hasReceipt: true, zohoSynced: true },
+  { id: 'tx02', cardId: 'c3', merchant: 'Google Ads', category: 'Marketing & Advertising', amount: 450, currency: 'AED', date: '2026-06-24', status: 'approved', hasReceipt: true, zohoSynced: true },
+  { id: 'tx03', cardId: 'c4', merchant: 'Emirates Business Class', category: 'Travel & Transport', amount: 3200, currency: 'AED', date: '2026-06-23', status: 'pending_approval', hasReceipt: false, zohoSynced: false, note: 'Business class to Riyadh — ADIPEC partner meeting' },
+  { id: 'tx04', cardId: 'c2', merchant: 'Jumeirah Beach Hotel', category: 'Travel & Transport', amount: 780, currency: 'AED', date: '2026-06-23', status: 'approved', hasReceipt: false, zohoSynced: false },
+  { id: 'tx05', cardId: 'c1', merchant: 'IKEA Dubai', category: 'Office & Stationery', amount: 1140, currency: 'AED', date: '2026-06-22', status: 'approved', hasReceipt: true, zohoSynced: true },
+  { id: 'tx06', cardId: 'c3', merchant: 'Canva Pro', category: 'Technology & Software', amount: 120, currency: 'AED', date: '2026-06-22', status: 'approved', hasReceipt: true, zohoSynced: true },
+  { id: 'tx07', cardId: 'c5', merchant: 'Carrefour Mall', category: 'Office & Stationery', amount: 85, currency: 'AED', date: '2026-06-21', status: 'approved', hasReceipt: false, zohoSynced: false },
+  { id: 'tx08', cardId: 'c4', merchant: 'DIFC Restaurant', category: 'Meals & Entertainment', amount: 560, currency: 'AED', date: '2026-06-21', status: 'approved', hasReceipt: false, zohoSynced: false },
+  { id: 'tx09', cardId: 'c2', merchant: 'Rotana Hotel Abu Dhabi', category: 'Travel & Transport', amount: 6200, currency: 'AED', date: '2026-06-20', status: 'pending_approval', hasReceipt: false, zohoSynced: false, note: '3-night stay for GITEX client sprint' },
+  { id: 'tx10', cardId: 'c1', merchant: 'Staples UAE', category: 'Office & Stationery', amount: 200, currency: 'AED', date: '2026-06-20', status: 'approved', hasReceipt: true, zohoSynced: true },
+  { id: 'tx11', cardId: 'c3', merchant: 'Meta Ads', category: 'Marketing & Advertising', amount: 320, currency: 'AED', date: '2026-06-19', status: 'approved', hasReceipt: true, zohoSynced: true },
+  { id: 'tx12', cardId: 'c4', merchant: 'Al Maha Desert Resort', category: 'Meals & Entertainment', amount: 1200, currency: 'AED', date: '2026-06-18', status: 'approved', hasReceipt: true, zohoSynced: true },
+  { id: 'tx13', cardId: 'c2', merchant: 'Uber Business', category: 'Travel & Transport', amount: 145, currency: 'AED', date: '2026-06-18', status: 'approved', hasReceipt: true, zohoSynced: true },
+  { id: 'tx14', cardId: 'c1', merchant: 'du Telecom', category: 'Utilities & Telecom', amount: 399, currency: 'AED', date: '2026-06-17', status: 'approved', hasReceipt: true, zohoSynced: true },
+  { id: 'tx15', cardId: 'c3', merchant: 'HubSpot', category: 'Technology & Software', amount: 680, currency: 'AED', date: '2026-06-17', status: 'approved', hasReceipt: true, zohoSynced: true },
 ]
 
 export const INITIAL_APPROVALS: Approval[] = [
@@ -152,6 +153,18 @@ export const CHART_OF_ACCOUNTS: Record<string, string> = {
 
 export function fmtAED(amount: number): string {
   return 'AED ' + new Intl.NumberFormat('en-AE', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount)
+}
+
+const _CURRENCY_SYMBOLS: Record<string, string> = {
+  USD: '$', EUR: '€', GBP: '£', SAR: 'SAR ', KWD: 'KWD ',
+  BHD: 'BHD ', QAR: 'QAR ', OMR: 'OMR ', MYR: 'MYR ',
+  INR: '₹', SGD: 'S$', CAD: 'CA$', AUD: 'A$',
+}
+
+export function fmtAmount(amount: number, currency = 'AED'): string {
+  if (!currency || currency.toUpperCase() === 'AED') return fmtAED(amount)
+  const sym = _CURRENCY_SYMBOLS[currency.toUpperCase()] ?? `${currency} `
+  return sym + new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount)
 }
 
 export function fmtDate(date: string): string {

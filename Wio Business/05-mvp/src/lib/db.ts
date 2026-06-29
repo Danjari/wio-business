@@ -23,6 +23,7 @@ function mapTransaction(r: Record<string, unknown>): Transaction {
     merchant:   r.merchant as string,
     category:   r.category as string,
     amount:     Number(r.amount),
+    currency:   (r.currency as string) || 'AED',
     date:       r.date as string,
     status:     r.status as Transaction['status'],
     hasReceipt: r.has_receipt as boolean,
